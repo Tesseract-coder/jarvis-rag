@@ -1,0 +1,10 @@
+# Direct dependencies. Pinned, resolved set lives in requirements.txt:
+#   make lock   (uv pip compile requirements.in -o requirements.txt)
+langchain>=1.4,<2
+langchain-core>=1.6,<2
+langchain-ollama>=1.1,<2
+langchain-chroma>=1.1,<2
+pydantic-settings>=2.16,<3
+httpx
+numpy
+pytest

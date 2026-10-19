@@ -1,0 +1,18 @@
+# python
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+*.egg-info/
+
+# secrets / local config
+.env
+
+# user data + generated stores
+data/
+storage/
+
+# editor / os
+.vscode/
+.idea/
+.DS_Store
