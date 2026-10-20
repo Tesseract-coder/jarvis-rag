@@ -1,0 +1,19 @@
+{"id": "a01", "kind": "sql", "turns": ["What was the total revenue per region?"], "tools": ["run_sql"], "numbers": [[13434000, 0], [10990000, 0], [9123000, 0]], "cite": "robot_sales"}
+{"id": "a02", "kind": "sql", "turns": ["How many support tickets are still open?"], "tools": ["run_sql"], "numbers": [[13, 0]], "cite": "support_tickets"}
+{"id": "a03", "kind": "sql", "turns": ["What is the average time to resolve tickets for each error code?"], "tools": ["run_sql"], "numbers": [[25.32, 0.06], [21.94, 0.06], [24.91, 0.06], [22.34, 0.06]], "cite": "support_tickets"}
+{"id": "a04", "kind": "sql", "turns": ["Which product sold more units in total, and how many?"], "tools": ["run_sql"], "contains": ["Wren W1"], "numbers": [[1198, 0]], "cite": "robot_sales"}
+{"id": "a05", "kind": "sql", "turns": ["Which quarter had the highest revenue?"], "tools": ["run_sql"], "contains": ["2026-Q3"], "cite": "robot_sales"}
+{"id": "a06", "kind": "sql", "turns": ["How many open tickets does each product have?"], "tools": ["run_sql"], "numbers": [[7, 0], [6, 0]], "cite": "support_tickets"}
+{"id": "a07", "kind": "sql+calc", "turns": ["What percentage of total revenue came from APAC?"], "tools": ["run_sql"], "numbers": [[40.05, 0.1]], "cite": "robot_sales"}
+{"id": "a08", "kind": "pdf", "turns": ["How many safety incidents were recorded in 2026?"], "tools": ["search_knowledge_base"], "numbers": [[14, 0]], "cite": "safety_report_2026.pdf, page"}
+{"id": "a09", "kind": "docx", "turns": ["How often should the wheel motor brushes be replaced?"], "tools": ["search_knowledge_base"], "numbers": [[4000, 0]], "cite": "kestrel_k2_maintenance.docx"}
+{"id": "a10", "kind": "code", "turns": ["Where is the chunk id hash computed?"], "tools": ["search_knowledge_base"], "contains": ["chunk_id"], "cite": "vectorstore.py"}
+{"id": "a11", "kind": "code", "turns": ["Which function decides whether a file is ignored by .gitignore?"], "tools": ["search_knowledge_base"], "contains": ["iter_files"], "cite": "loaders.py"}
+{"id": "a12", "kind": "text", "turns": ["What does error E-217 mean and what should I do about it?"], "tools": ["search_knowledge_base"], "contains": ["overcurrent"], "cite": "product_specs.md"}
+{"id": "a13", "kind": "mixed", "turns": ["What does error E-217 mean, and how many support tickets have that error code?"], "tools": ["search_knowledge_base", "run_sql"], "contains": ["overcurrent"], "numbers": [[53, 0]], "cite": "support_tickets"}
+{"id": "a14", "kind": "calc", "turns": ["What is 17% of 2340?"], "tools": ["calculator"], "numbers": [[397.8, 0.01]]}
+{"id": "a15", "kind": "memory", "turns": ["What is the battery life of the Kestrel K2?", "And the Wren W1?"], "tools": ["search_knowledge_base"], "numbers": [[9, 0]], "cite": "product_specs.md"}
+{"id": "a16", "kind": "unanswerable", "turns": ["Who is the CEO of Halcyon Robotics?"], "tools": ["search_knowledge_base"], "abstain": true}
+{"id": "a17", "kind": "unanswerable", "turns": ["Does the Kestrel K2 support 5G connectivity?"], "tools": ["search_knowledge_base"], "abstain": true}
+{"id": "a18", "kind": "unanswerable", "turns": ["What was the total revenue in 2023?"], "tools": [], "abstain": true}
+{"id": "a19", "kind": "smalltalk", "turns": ["Good evening, JARVIS."], "tools": [], "no_abstain": true}

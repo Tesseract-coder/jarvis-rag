@@ -63,6 +63,17 @@ class Settings(BaseSettings):
     url_max_pages: int = 25
     user_agent: str = "jarvis-rag (self-hosted RAG ingester)"
 
+    # Agent (Phase 4)
+    memory_backend: Literal["sqlite", "memory"] = "sqlite"  # sqlite = conversations survive restarts
+    auto_search: bool = True  # search the knowledge base before every turn (small models forget to)
+    agent_max_model_calls: int = 8  # per question: stops a confused small model looping on tools
+    history_max_tokens: int = 3000  # older turns are dropped from the prompt (kept on disk)
+    tool_output_max_chars: int = 4000
+    sql_max_rows: int = 200
+    sql_timeout_s: float = 5.0
+    allow_ingest_tool: bool = False  # let the agent write notes into the knowledge base
+    fetch_allow_private: bool = False  # let fetch_url reach localhost / LAN addresses
+
     # Paths
     data_dir: Path = Path("data")
     storage_dir: Path = Path("storage")
@@ -81,6 +92,12 @@ class Settings(BaseSettings):
     @property
     def sqlite_path(self) -> Path:
         return self.storage_dir / "jarvis.db"
+
+    @property
+    def memory_path(self) -> Path:
+        # Separate from jarvis.db on purpose: run_sql can read every table in jarvis.db,
+        # and conversation history is not something the model should query.
+        return self.storage_dir / "memory.db"
 
     @property
     def models_dir(self) -> Path:

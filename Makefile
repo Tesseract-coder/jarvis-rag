@@ -9,7 +9,7 @@ FALLBACK_CHAT_MODEL ?= qwen3:1.7b
 EMBED_MODEL ?= nomic-embed-text
 DATA_DIR ?= data
 
-.PHONY: help setup lock pull-models check test demo-data ingest sources eval eval-answers
+.PHONY: help setup lock pull-models check test demo-data ingest sources eval eval-answers chat eval-agent
 
 help:
 	@grep -hE '^[a-z-]+:.*## ' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  %-12s %s\n", $$1, $$2}'
@@ -44,6 +44,12 @@ eval: ## retrieval quality: hit@k / MRR for similarity, mmr, hybrid, rerank
 
 eval-answers: ## + generate answers and grade them with the LLM as judge (slow)
 	$(PY) eval/run_eval.py --modes $(or $(RETRIEVAL_MODE),rerank) --answers
+
+chat: ## talk to JARVIS in the terminal (memory: storage/memory.db)
+	$(PY) -m jarvis_rag.agent
+
+eval-agent: ## grade the agent: tool choice, numbers, citations, abstention (~4 min)
+	$(PY) eval/run_agent_eval.py
 
 test: ## run the test suite (no GPU or Ollama needed)
 	$(PY) -m pytest -q

@@ -4,7 +4,7 @@
 code, websites and CSVs. Built in phases as a learn-by-building project; teaching notes
 live in [`docs/`](docs/).
 
-> Status: **Phase 3: retrieval quality** ✅
+> Status: **Phase 4: the JARVIS agent** ✅
 
 | Phase | Notes |
 |---|---|
@@ -12,6 +12,7 @@ live in [`docs/`](docs/).
 | 1: LLM calls, embeddings, vector DB, RAG and an agent loop with no frameworks | [docs/phase-1.md](docs/phase-1.md) |
 | 2: Ingestion (PDF, DOCX, Markdown, code, URLs, CSV→SQLite) into Chroma | [docs/phase-2.md](docs/phase-2.md) |
 | 3: Retrieval quality: similarity vs MMR vs hybrid BM25 vs reranker, measured by `eval/` | [docs/phase-3.md](docs/phase-3.md) |
+| 4: The agent: `create_agent`, tools (search, SQL, web, calculator), memory, streaming CLI | [docs/phase-4.md](docs/phase-4.md) |
 
 ## Quick start
 
@@ -58,7 +59,17 @@ make eval                                    # hit@1/3/5, MRR, latency per mode 
 .venv/bin/python -m jarvis_rag.retriever "what does E-217 mean?"   # one query, all four modes
 ```
 
+Chat with JARVIS (it searches, runs read-only SQL, fetches URLs, does arithmetic, and cites):
+
+```bash
+make chat                                                       # REPL; /new /thread NAME /history /quit
+.venv/bin/python -m jarvis_rag.agent -q "Total revenue per region?"
+.venv/bin/python -m jarvis_rag.agent --thread work              # same thread id = same memory
+make eval-agent                                                 # tool choice, numbers, citations, abstention
+```
+
 CSVs become SQLite tables in `storage/jarvis.db` (only their schema is embedded).
+Conversations live in `storage/memory.db`.
 Vectors live in `storage/chroma`.
 
 ## Learn by building

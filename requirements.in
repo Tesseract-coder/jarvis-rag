@@ -14,6 +14,8 @@ pathspec>=1,<2
 # Phase 3: cross-encoder reranker (ONNX, CPU; also the Phase 7 embedder)
 fastembed>=0.9,<0.10
 py-rust-stemmers>=0.1  # Snowball stemming for BM25 (already a fastembed dependency)
+# Phase 4: persistent conversation memory (SqliteSaver)
+langgraph-checkpoint-sqlite>=3.1,<4
 httpx
 numpy
 pytest
