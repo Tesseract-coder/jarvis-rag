@@ -1,6 +1,6 @@
 """The agent loop with a scripted chat model: no Ollama, no GPU.
 
-ScriptedModel replays AIMessages in order and records what it was shown, so the
+ScriptedModel (tests/fakes.py) replays AIMessages and records what it was shown, so the
 tests can check what actually reached the model (system prompt, auto-search,
 trimmed history, nudges) as well as what came out.
 """
@@ -8,37 +8,16 @@ trimmed history, nudges) as well as what came out.
 import pytest
 from langchain_core.documents import Document
 from langchain_core.embeddings import DeterministicFakeEmbedding
-from langchain_core.language_models import BaseChatModel
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage, ToolMessage
-from langchain_core.outputs import ChatGeneration, ChatResult
 from langgraph.checkpoint.memory import InMemorySaver
+
+from fakes import ScriptedModel, call
 
 from jarvis_rag.agent import ask, build_agent, catalogue, fit_history, needs_sql_nudge, stream_events, system_prompt
 from jarvis_rag.config import Settings
 from jarvis_rag.ingest import ingest_documents
 from jarvis_rag.loaders import load_csv
 from jarvis_rag.vectorstore import KnowledgeBase
-
-
-class ScriptedModel(BaseChatModel):
-    script: list
-    seen: list = []
-
-    @property
-    def _llm_type(self) -> str:
-        return "scripted"
-
-    def bind_tools(self, tools, **kwargs):
-        return self
-
-    def _generate(self, messages, stop=None, run_manager=None, **kwargs):
-        self.seen.append(list(messages))
-        msg = self.script.pop(0) if self.script else AIMessage("(script exhausted)")
-        return ChatResult(generations=[ChatGeneration(message=msg)])
-
-
-def call(name: str, **args) -> AIMessage:
-    return AIMessage("", tool_calls=[{"name": name, "args": args, "id": f"c-{name}-{len(args)}"}])
 
 
 @pytest.fixture

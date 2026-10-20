@@ -269,6 +269,27 @@ def stream_events(agent, question: str, thread_id: str) -> Iterator[dict]:
     yield {"type": "answer", "text": final}
 
 
+LABEL_LINE = re.compile(r"^\[([^\[\]\n]{2,300})\]", re.M)
+CITED = re.compile(r"\[([^\[\]\n]{2,300})\]")
+
+
+def check_citations(answer: str, tool_outputs: list[str]) -> list[dict]:
+    """Every bracketed source label in the answer, and whether a tool really returned
+    it this turn. Phase 4 caught the model citing documents it never read; this
+    makes that visible to API clients instead of trusting the brackets.
+
+    A citation without the page/lines ("[x.pdf]" for "[x.pdf, page 2]") still counts."""
+    available = {m for out in tool_outputs for m in LABEL_LINE.findall(out)}
+    out = []
+    for label in dict.fromkeys(c.strip() for c in CITED.findall(answer)):
+        label = label.removeprefix("cite ").strip()
+        if not ("/" in label or "." in label or label.startswith("table ")):
+            continue  # "[1]", "[sic]": not a source label
+        ok = label in available or any(a.split(",")[0] == label.split(",")[0] for a in available)
+        out.append({"label": label, "verified": ok})
+    return out
+
+
 def ask(agent, question: str, thread_id: str = "default") -> str:
     """One question, one answer string (no streaming)."""
     result = agent.invoke({"messages": [HumanMessage(question)]}, config_for(thread_id))

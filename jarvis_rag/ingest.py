@@ -100,8 +100,9 @@ def clean(text: str) -> str:
 
 
 def collect(paths: list[Path], urls: list[str], csvs: list[Path], crawl_depth: int,
-            s: Settings) -> tuple[list[Document], list[tuple[str, str]]]:
-    """Load everything; return (documents, [(what, why_skipped)])."""
+            s: Settings, web: WebLoader | None = None) -> tuple[list[Document], list[tuple[str, str]]]:
+    """Load everything; return (documents, [(what, why_skipped)]). `web` lets the API
+    pass a loader that refuses private addresses."""
     docs, skipped = [], []
     max_bytes = int(s.max_file_mb * 1e6)
     missing = [p for p in [*paths, *csvs] if not p.exists()]
@@ -116,7 +117,7 @@ def collect(paths: list[Path], urls: list[str], csvs: list[Path], crawl_depth: i
         except Exception as e:  # one broken file must not abort a 1000-file ingest
             skipped.append((str(f), f"{type(e).__name__}: {e}"))
     if urls:
-        web = WebLoader(s.user_agent, s.url_max_pages)
+        web = web or WebLoader(s.user_agent, s.url_max_pages)
         for url in urls:
             docs += web.crawl(url, crawl_depth)
         skipped += web.skipped

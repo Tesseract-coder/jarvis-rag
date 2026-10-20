@@ -8,8 +8,10 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Literal
 
-from pydantic import field_validator
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from typing import Annotated
+
+from pydantic import SecretStr, field_validator
+from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 
 class Settings(BaseSettings):
@@ -74,6 +76,15 @@ class Settings(BaseSettings):
     allow_ingest_tool: bool = False  # let the agent write notes into the knowledge base
     fetch_allow_private: bool = False  # let fetch_url reach localhost / LAN addresses
 
+    # HTTP API (Phase 5)
+    api_host: str = "127.0.0.1"  # 0.0.0.0 exposes it to your network: then API_KEY is required
+    api_port: int = 8000
+    api_key: SecretStr | None = None  # clients send it as the X-API-Key header
+    cors_origins: Annotated[list[str], NoDecode] = ["http://localhost:7860", "http://127.0.0.1:7860",
+                                                    "http://localhost:3000"]
+    max_message_chars: int = 4000
+    max_crawl_depth: int = 2
+
     # Paths
     data_dir: Path = Path("data")
     storage_dir: Path = Path("storage")
@@ -84,6 +95,20 @@ class Settings(BaseSettings):
         if isinstance(v, str) and v.strip().lower() in ("", "auto", "none"):
             return None
         return v
+
+    @field_validator("cors_origins", mode="before")
+    @classmethod
+    def _split_origins(cls, v):
+        return [o.strip() for o in v.split(",") if o.strip()] if isinstance(v, str) else v
+
+    @field_validator("api_key", mode="before")
+    @classmethod
+    def _empty_key_is_none(cls, v):
+        return None if isinstance(v, str) and not v.strip() else v
+
+    @property
+    def upload_dir(self) -> Path:
+        return self.data_dir / "uploads"
 
     @property
     def chroma_dir(self) -> Path:

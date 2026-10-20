@@ -14,6 +14,11 @@ pathspec>=1,<2
 # Phase 3: cross-encoder reranker (ONNX, CPU; also the Phase 7 embedder)
 fastembed>=0.9,<0.10
 py-rust-stemmers>=0.1  # Snowball stemming for BM25 (already a fastembed dependency)
+# Phase 5: HTTP API. FastAPI pinned to a release >= 2 weeks old (many same-day releases at lock time)
+fastapi>=0.142,<0.142.3
+starlette>=1.7,<1.8
+uvicorn>=0.40,<1
+python-multipart>=0.0.20,<0.1
 # Phase 4: persistent conversation memory (SqliteSaver)
 langgraph-checkpoint-sqlite>=3.1,<4
 httpx

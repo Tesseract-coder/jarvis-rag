@@ -195,6 +195,10 @@ def format_number(x: float | int) -> str:
 
 # --------------------------------------------------------------------------- web
 
+class BlockedURL(ToolInputError, httpx.HTTPError):
+    """Also an httpx error, so WebLoader.crawl skips the page instead of aborting."""
+
+
 def public_only_hook(request: httpx.Request) -> None:
     """httpx calls this before EVERY request, redirects included, so a public URL
     that redirects to http://localhost:8000/admin is caught too. Stops the model
@@ -204,17 +208,19 @@ def public_only_hook(request: httpx.Request) -> None:
     try:
         infos = socket.getaddrinfo(host, None)
     except socket.gaierror as e:
-        raise ToolInputError(f"Cannot resolve host {host!r}.") from e
+        raise BlockedURL(f"Cannot resolve host {host!r}.") from e
     for info in infos:
         ip = ipaddress.ip_address(info[4][0])
         if not ip.is_global:
-            raise ToolInputError(f"Refusing to fetch {host} ({ip}): private or local address.")
+            raise BlockedURL(f"Refusing to fetch {host} ({ip}): private or local address.")
 
 
-def make_web_loader(s: Settings) -> loaders.WebLoader:
+def make_web_loader(s: Settings, max_pages: int = 1) -> loaders.WebLoader:
+    """A WebLoader for URLs chosen by the model or by API callers, not by you at the
+    terminal: private addresses refused unless FETCH_ALLOW_PRIVATE=true."""
     hooks = {} if s.fetch_allow_private else {"request": [public_only_hook]}
     client = httpx.Client(timeout=20, follow_redirects=True, max_redirects=5, event_hooks=hooks)
-    return loaders.WebLoader(s.user_agent, max_pages=1, client=client)
+    return loaders.WebLoader(s.user_agent, max_pages=max_pages, client=client)
 
 
 # --------------------------------------------------------------------------- the tools
@@ -259,7 +265,7 @@ def build_tools(kb: KnowledgeBase, retriever: Retriever, s: Settings,
         if name not in names:  # also what keeps the name safe to put in PRAGMA / SELECT below
             raise ToolInputError(f"No table {table!r}. Tables: {', '.join(names) or 'none'}.")
         with sqlite3.connect(f"file:{db_path}?mode=ro", uri=True) as conn:
-            return loaders.describe_table(conn, name)
+            return f"[table {name}]\n" + loaders.describe_table(conn, name)
 
     @tool(parse_docstring=True)
     def run_sql(query: str) -> str:
@@ -270,7 +276,9 @@ def build_tools(kb: KnowledgeBase, retriever: Retriever, s: Settings,
             query: A single SELECT statement, e.g. SELECT region, SUM(revenue_eur) FROM robot_sales GROUP BY region
         """
         cols, rows, truncated = run_select(db_path, query, s.sql_max_rows, s.sql_timeout_s)
-        return clip(format_rows(cols, rows, truncated, s.sql_max_rows), limit)
+        used = [n for n in table_names(db_path) if re.search(rf"\b{re.escape(n)}\b", query, re.I)]
+        labels = "".join(f"[table {n}]\n" for n in used)  # what to cite, like every other tool
+        return labels + clip(format_rows(cols, rows, truncated, s.sql_max_rows), limit)
 
     @tool(parse_docstring=True)
     def fetch_url(url: str) -> str:
@@ -282,12 +290,14 @@ def build_tools(kb: KnowledgeBase, retriever: Retriever, s: Settings,
         if urlparse(url).scheme not in ("http", "https"):
             raise ToolInputError("Only http:// and https:// URLs can be fetched.")
         loader = web or make_web_loader(s)
-        if not loader.allowed(url):
-            raise ToolInputError(f"robots.txt of that site disallows fetching {url}.")
         try:
+            if not loader.allowed(url):
+                raise ToolInputError(f"robots.txt of that site disallows fetching {url}.")
             docs, _ = loader.fetch(url)
         except loaders.SkipFile as e:
             raise ToolInputError(f"Could not read {url}: {e}") from e
+        except BlockedURL:
+            raise
         except httpx.HTTPError as e:
             raise ToolInputError(f"Could not fetch {url}: {type(e).__name__} {e}") from e
         text = "\n\n".join(d.page_content for d in docs)

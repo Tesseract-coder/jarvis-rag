@@ -63,11 +63,12 @@ def test_runaway_query_times_out(env):
 def test_sql_tools(env):
     s, _, t = env
     assert t["list_tables"].invoke({}) == "Tables: sales"
-    assert "units (INTEGER): 5 to 30" in t["describe_table"].invoke({"table": "`sales`"})
+    desc = t["describe_table"].invoke({"table": "`sales`"})
+    assert desc.startswith("[table sales]\n") and "units (INTEGER): 5 to 30" in desc
     with pytest.raises(ToolInputError, match="Tables: sales"):
         t["describe_table"].invoke({"table": "sales; DROP TABLE sales"})
     out = t["run_sql"].invoke({"query": "SELECT region, SUM(units) FROM sales GROUP BY region ORDER BY 2 DESC"})
-    assert out.splitlines()[:3] == ["2 row(s):", "region | SUM(units)", "EMEA | 40"]
+    assert out.splitlines()[:4] == ["[table sales]", "2 row(s):", "region | SUM(units)", "EMEA | 40"]
 
 
 def test_sql_row_cap(env):

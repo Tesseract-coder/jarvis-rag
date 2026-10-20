@@ -4,7 +4,7 @@
 code, websites and CSVs. Built in phases as a learn-by-building project; teaching notes
 live in [`docs/`](docs/).
 
-> Status: **Phase 4: the JARVIS agent** ✅
+> Status: **Phase 5: HTTP API** ✅
 
 | Phase | Notes |
 |---|---|
@@ -13,6 +13,7 @@ live in [`docs/`](docs/).
 | 2: Ingestion (PDF, DOCX, Markdown, code, URLs, CSV→SQLite) into Chroma | [docs/phase-2.md](docs/phase-2.md) |
 | 3: Retrieval quality: similarity vs MMR vs hybrid BM25 vs reranker, measured by `eval/` | [docs/phase-3.md](docs/phase-3.md) |
 | 4: The agent: `create_agent`, tools (search, SQL, web, calculator), memory, streaming CLI | [docs/phase-4.md](docs/phase-4.md) |
+| 5: FastAPI: chat, SSE streaming, ingestion, sources, API key, CORS, Python/JS clients | [docs/phase-5.md](docs/phase-5.md) |
 
 ## Quick start
 
@@ -68,8 +69,19 @@ make chat                                                       # REPL; /new /th
 make eval-agent                                                 # tool choice, numbers, citations, abstention
 ```
 
+Serve it over HTTP (interactive docs at http://127.0.0.1:8000/docs):
+
+```bash
+make api                                                        # API_HOST:API_PORT from .env
+curl -s localhost:8000/chat -H "X-API-Key: $KEY" -H 'content-type: application/json' \
+     -d '{"message": "How many support tickets are open?"}'
+curl -s localhost:8000/ingest/file -H "X-API-Key: $KEY" -F file=@report.pdf
+JARVIS_API_KEY=$KEY python examples/client.py "What does E-217 mean?"     # streaming, httpx only
+JARVIS_API_KEY=$KEY node examples/client.js "Which robot lasts longer?"   # streaming, no deps
+```
+
 CSVs become SQLite tables in `storage/jarvis.db` (only their schema is embedded).
-Conversations live in `storage/memory.db`.
+Conversations live in `storage/memory.db`; uploads in `data/uploads/`.
 Vectors live in `storage/chroma`.
 
 ## Learn by building
