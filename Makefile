@@ -9,7 +9,7 @@ FALLBACK_CHAT_MODEL ?= qwen3:1.7b
 EMBED_MODEL ?= nomic-embed-text
 DATA_DIR ?= data
 
-.PHONY: help setup lock pull-models check test demo-data ingest sources
+.PHONY: help setup lock pull-models check test demo-data ingest sources eval eval-answers
 
 help:
 	@grep -hE '^[a-z-]+:.*## ' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  %-12s %s\n", $$1, $$2}'
@@ -38,6 +38,12 @@ ingest: ## ingest data/docs, data/code and data/csv (idempotent; re-run any time
 
 sources: ## list what is in the knowledge base
 	$(PY) -m jarvis_rag.ingest --list
+
+eval: ## retrieval quality: hit@k / MRR for similarity, mmr, hybrid, rerank
+	$(PY) eval/run_eval.py
+
+eval-answers: ## + generate answers and grade them with the LLM as judge (slow)
+	$(PY) eval/run_eval.py --modes $(or $(RETRIEVAL_MODE),rerank) --answers
 
 test: ## run the test suite (no GPU or Ollama needed)
 	$(PY) -m pytest -q

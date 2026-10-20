@@ -5,6 +5,8 @@ from the model's architecture, then runs one chat call and one embedding
 call through the same factories the app uses and reports real numbers.
 """
 
+import os
+import re
 import shutil
 import subprocess
 import sys
@@ -153,6 +155,36 @@ def smoke_embed(s: Settings) -> None:
            f"  cos(car,banana)={cosine(vecs[0], vecs[2]):.3f}")
 
 
+LLAMA_CACHE_RAM_DEFAULT_MIB = 8192
+
+
+def parse_cache_ram(systemd_env: str) -> int | None:
+    """LLAMA_ARG_CACHE_RAM from `systemctl show ollama -p Environment` output."""
+    m = re.search(r"LLAMA_ARG_CACHE_RAM=(-?\d+)", systemd_env)
+    return int(m.group(1)) if m else None
+
+
+def check_prompt_cache_ram() -> None:
+    """Ollama's llama-server keeps every recent prompt's KV state in *system* RAM
+    (~140 MiB each for qwen3:4b at 8k ctx), up to LLAMA_ARG_CACHE_RAM (default
+    8192 MiB). On a small-RAM machine that grows until the OOM killer stops Ollama.
+    Found the hard way in Phase 3; see docs/phase-3.md."""
+    try:
+        total_mib = os.sysconf("SC_PAGE_SIZE") * os.sysconf("SC_PHYS_PAGES") // MIB
+        env = subprocess.run(["systemctl", "show", "ollama", "-p", "Environment"],
+                             capture_output=True, text=True, timeout=5).stdout
+    except (OSError, ValueError, subprocess.SubprocessError):
+        return  # not Linux/systemd: nothing to check
+    limit = parse_cache_ram(env)
+    effective = LLAMA_CACHE_RAM_DEFAULT_MIB if limit is None else limit
+    detail = f"limit {effective} MiB{' (default)' if limit is None else ''}, system RAM {total_mib} MiB"
+    if effective < 0 or effective > total_mib // 4:
+        report(None, "prompt cache RAM", detail + " -> may OOM-kill Ollama; set LLAMA_ARG_CACHE_RAM=1024 "
+               "in a systemd drop-in (docs/phase-3.md)")
+    else:
+        report(True, "prompt cache RAM", detail)
+
+
 def check_placement(client: httpx.Client) -> None:
     for m in client.get("/api/ps").json()["models"]:
         gpu_pct = 100 * m["size_vram"] / m["size"] if m["size"] else 0
@@ -171,6 +203,7 @@ def main() -> int:
             smoke_chat(s)
             smoke_embed(s)
             check_placement(client)
+            check_prompt_cache_ram()
     print("\nAll checks passed." if _failures == 0 else f"\n{_failures} check(s) failed.")
     return 1 if _failures else 0
 

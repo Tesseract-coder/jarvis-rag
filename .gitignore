@@ -16,3 +16,6 @@ storage/
 .vscode/
 .idea/
 .DS_Store
+
+# eval outputs
+eval/results/

@@ -53,3 +53,10 @@ def test_cosine():
     assert cosine([1, 0], [1, 0]) == pytest.approx(1.0)
     assert cosine([1, 0], [0, 1]) == pytest.approx(0.0)
     assert cosine([1, 1], [-1, -1]) == pytest.approx(-1.0)
+
+
+def test_parse_cache_ram_from_systemd():
+    from jarvis_rag.check_env import parse_cache_ram
+    assert parse_cache_ram('Environment=PATH=/usr/bin LLAMA_ARG_CACHE_RAM=1024') == 1024
+    assert parse_cache_ram('Environment=PATH=/usr/bin') is None
+    assert parse_cache_ram('Environment=LLAMA_ARG_CACHE_RAM=-1') == -1

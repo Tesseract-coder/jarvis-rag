@@ -49,6 +49,15 @@ class Settings(BaseSettings):
     # Vector store
     collection_name: str = "jarvis"
 
+    # Retrieval (Phase 3; eval/run_eval.py compares the modes)
+    retrieval_mode: Literal["similarity", "mmr", "hybrid", "rerank"] = "rerank"
+    retrieval_k: int = 5
+    fetch_k: int = 20  # candidates per retriever before fusion / MMR / reranking
+    mmr_lambda: float = 0.5  # 1 = pure relevance, 0 = pure diversity
+    bm25_weight: float = 0.5  # hybrid: share of BM25 in rank fusion (vector gets the rest)
+    rrf_c: int = 60  # rank-fusion constant from the RRF paper
+    reranker_model: str = "Xenova/ms-marco-MiniLM-L-6-v2"
+
     # Ingestion limits
     max_file_mb: float = 20.0
     url_max_pages: int = 25
@@ -72,6 +81,10 @@ class Settings(BaseSettings):
     @property
     def sqlite_path(self) -> Path:
         return self.storage_dir / "jarvis.db"
+
+    @property
+    def models_dir(self) -> Path:
+        return self.storage_dir / "models"
 
 
 @lru_cache

@@ -11,6 +11,9 @@ pypdf>=6,<7
 trafilatura>=2.3,<3
 pandas>=3,<4
 pathspec>=1,<2
+# Phase 3: cross-encoder reranker (ONNX, CPU; also the Phase 7 embedder)
+fastembed>=0.9,<0.10
+py-rust-stemmers>=0.1  # Snowball stemming for BM25 (already a fastembed dependency)
 httpx
 numpy
 pytest
