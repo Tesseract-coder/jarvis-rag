@@ -163,6 +163,14 @@ def test_sql_follow_through_asks_again(env):
     assert not any("automatic check" in m.text for m in stored)  # the nudge is not saved to memory
 
 
+def test_sql_follow_through_tells_streaming_clients_to_discard_the_draft(env):
+    agent, _ = make(env, AIMessage("Probably about 20."), call("run_sql", query="SELECT SUM(units) FROM sales"),
+                    AIMessage("15 [table sales]"))
+    kinds = [e["type"] for e in stream_events(agent, "How many units in total?", "t")]
+    assert kinds.index("discard") < kinds.index("tool_call", 1)  # discard comes before the SQL call
+    assert kinds[-1] == "answer"
+
+
 def test_catalogue_refreshes_after_ingest(env):
     s, kb = env
     agent, model = make(env, AIMessage("a"), AIMessage("b"), auto_search=False)

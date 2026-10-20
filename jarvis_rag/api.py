@@ -8,6 +8,7 @@
     POST   /chat/stream            same, as Server-Sent Events: tool_call, tool_result, token, answer
     POST   /ingest/file            multipart upload (pdf, docx, md/txt, code, csv)
     POST   /ingest/url             {"url", "crawl_depth"?}
+    GET    /threads/{thread_id}    a conversation's messages (to redraw it after a page reload)
     GET    /sources                what is indexed
     DELETE /sources/{source}       remove a source (and its uploaded file / SQL table)
 
@@ -27,10 +28,12 @@ from typing import Annotated
 
 import httpx
 from fastapi import Depends, FastAPI, File, HTTPException, Request, Security, UploadFile
+from fastapi import Path as FastApiPath
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.security import APIKeyHeader
 from fastapi.sse import EventSourceResponse, ServerSentEvent
+from langchain_core.messages import AIMessage, HumanMessage
 from pydantic import BaseModel, Field
 
 from jarvis_rag import loaders
@@ -69,6 +72,12 @@ class ChatResponse(BaseModel):
     thread_id: str
     tool_calls: list[ToolCall]
     citations: list[Citation]
+
+
+class ThreadMessage(BaseModel):
+    role: str = Field(description="user | assistant")
+    content: str
+    tools: list[str] = Field(default=[], description="tools called before this assistant message")
 
 
 class UrlRequest(BaseModel):
@@ -219,7 +228,8 @@ def create_app(settings: Settings | None = None, kb: KnowledgeBase | None = None
     @app.post("/chat/stream", response_class=EventSourceResponse, dependencies=auth)
     def chat_stream(req: ChatRequest):
         """SSE events: `start` {thread_id}, `tool_call`, `tool_result`, `token` {text},
-        `answer` {text, thread_id, citations}, or `error` {message}."""
+        `discard` {reason} (drop tokens since the last tool call), `answer` {text, thread_id,
+        citations}, or `error` {message}."""
         thread_id = check_message(req)
         yield ServerSentEvent(event="start", data={"thread_id": thread_id})
         outputs = []
@@ -235,6 +245,23 @@ def create_app(settings: Settings | None = None, kb: KnowledgeBase | None = None
         except Exception as e:  # headers are already sent: report in-band, don't drop the stream
             log.exception("chat stream failed")
             yield ServerSentEvent(event="error", data={"message": f"internal error ({type(e).__name__})"})
+
+    @app.get("/threads/{thread_id}", response_model=list[ThreadMessage], dependencies=auth)
+    def thread(thread_id: Annotated[str, FastApiPath(pattern=THREAD_ID)]):
+        """A conversation's user/assistant messages (tool traffic summarised as tool names),
+        so a UI can redraw it after a reload. Unknown id = empty list."""
+        messages = agent.get_state({"configurable": {"thread_id": thread_id}}).values.get("messages", [])
+        out, tools = [], []
+        for m in messages:
+            if isinstance(m, HumanMessage):
+                out.append(ThreadMessage(role="user", content=m.text))
+                tools = []
+            elif isinstance(m, AIMessage):
+                tools += [c["name"] for c in m.tool_calls]
+                if not m.tool_calls and m.text:
+                    out.append(ThreadMessage(role="assistant", content=m.text, tools=tools))
+                    tools = []
+        return out
 
     # ---- ingestion
     @app.post("/ingest/file", response_model=IngestResponse, dependencies=auth)

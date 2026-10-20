@@ -85,6 +85,13 @@ class Settings(BaseSettings):
     max_message_chars: int = 4000
     max_crawl_depth: int = 2
 
+    # Web UI (Phase 6)
+    ui_host: str = "127.0.0.1"
+    ui_port: int = 7860
+    api_url: str = "http://127.0.0.1:8000"  # where the standalone UI finds the API
+    ui_username: str = "jarvis"
+    ui_password: SecretStr | None = None  # required when UI_HOST is not localhost
+
     # Paths
     data_dir: Path = Path("data")
     storage_dir: Path = Path("storage")
@@ -101,7 +108,7 @@ class Settings(BaseSettings):
     def _split_origins(cls, v):
         return [o.strip() for o in v.split(",") if o.strip()] if isinstance(v, str) else v
 
-    @field_validator("api_key", mode="before")
+    @field_validator("api_key", "ui_password", mode="before")
     @classmethod
     def _empty_key_is_none(cls, v):
         return None if isinstance(v, str) and not v.strip() else v

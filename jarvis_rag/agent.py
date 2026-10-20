@@ -33,6 +33,7 @@ from langchain_core.messages.utils import count_tokens_approximately
 from langchain_core.tools import BaseTool
 from langgraph.checkpoint.base import BaseCheckpointSaver
 from langgraph.checkpoint.memory import InMemorySaver
+from langgraph.config import get_stream_writer
 
 from jarvis_rag.config import Settings, get_settings
 from jarvis_rag.tools import build_tools, tool_error_message
@@ -184,6 +185,8 @@ def sql_follow_through():
             return response
         nudge = HumanMessage(f"(automatic check) Don't describe the query and don't guess: call run_sql on "
                              f"{table} now to get the exact number, then answer with a citation.")
+        # Its tokens were already streamed to the user: tell clients to retract them.
+        get_stream_writer()({"type": "discard", "reason": f"checking with SQL ({table})"})
         return handler(request.override(messages=[*request.messages, answer, nudge]))
 
     return follow_through
@@ -246,11 +249,16 @@ def stream_events(agent, question: str, thread_id: str) -> Iterator[dict]:
         {"type": "token", "text": ...}              piece of the answer as it is generated
         {"type": "tool_call", "name", "args", "id"} the model asked for a tool
         {"type": "tool_result", "name", "content", "id", "error"}
+        {"type": "discard", "reason": ...}          a guard rejected the text streamed since the
+                                                    last tool call; clients should remove it
         {"type": "answer", "text": ...}             the final answer, once
     """
     final = ""
     for mode, data in agent.stream({"messages": [HumanMessage(question)]}, config_for(thread_id),
-                                   stream_mode=["messages", "updates"]):
+                                   stream_mode=["messages", "updates", "custom"]):
+        if mode == "custom":  # events middleware sent with get_stream_writer()
+            yield data
+            continue
         if mode == "messages":
             chunk, meta = data
             if meta.get("langgraph_node") == "model" and isinstance(chunk, AIMessageChunk) and chunk.content:
@@ -314,6 +322,9 @@ def run_turn(agent, question: str, thread_id: str, quiet: bool, name: str) -> No
             streamed = True
         elif ev["type"] == "tool_call" and not quiet:
             print(f"\n{DIM}  → {ev['name']}({fmt_args(ev['args'])}){RESET}", end="", flush=True)
+        elif ev["type"] == "discard":
+            print(f"\n{DIM}  ✗ draft discarded: {ev['reason']}{RESET}", end="", flush=True)
+            streamed = False
         elif ev["type"] == "tool_result" and not quiet:
             first = ev["content"].strip().splitlines()[0][:110] if ev["content"].strip() else "(empty)"
             print(f"\n{DIM}  ← {'ERROR ' if ev['error'] else ''}{first}{RESET}\n", end="", flush=True)

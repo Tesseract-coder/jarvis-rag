@@ -4,7 +4,7 @@
 code, websites and CSVs. Built in phases as a learn-by-building project; teaching notes
 live in [`docs/`](docs/).
 
-> Status: **Phase 5: HTTP API** ✅
+> Status: **Phase 6: web UI** ✅
 
 | Phase | Notes |
 |---|---|
@@ -14,6 +14,7 @@ live in [`docs/`](docs/).
 | 3: Retrieval quality: similarity vs MMR vs hybrid BM25 vs reranker, measured by `eval/` | [docs/phase-3.md](docs/phase-3.md) |
 | 4: The agent: `create_agent`, tools (search, SQL, web, calculator), memory, streaming CLI | [docs/phase-4.md](docs/phase-4.md) |
 | 5: FastAPI: chat, SSE streaming, ingestion, sources, API key, CORS, Python/JS clients | [docs/phase-5.md](docs/phase-5.md) |
+| 6: Gradio UI: streaming chat with tool steps and checked citations, uploads, source management | [docs/phase-6.md](docs/phase-6.md) |
 
 ## Quick start
 
@@ -68,6 +69,15 @@ make chat                                                       # REPL; /new /th
 .venv/bin/python -m jarvis_rag.agent --thread work              # same thread id = same memory
 make eval-agent                                                 # tool choice, numbers, citations, abstention
 ```
+
+Use it in the browser:
+
+```bash
+make app                    # one process: http://127.0.0.1:8000/ui (API on the same port)
+make api & make ui          # or two: API on :8000, UI on http://127.0.0.1:7860
+```
+
+![JARVIS web UI](docs/img/phase-6-chat.png)
 
 Serve it over HTTP (interactive docs at http://127.0.0.1:8000/docs):
 

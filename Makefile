@@ -9,7 +9,7 @@ FALLBACK_CHAT_MODEL ?= qwen3:1.7b
 EMBED_MODEL ?= nomic-embed-text
 DATA_DIR ?= data
 
-.PHONY: help setup lock pull-models check test demo-data ingest sources eval eval-answers chat eval-agent api
+.PHONY: help setup lock pull-models check test demo-data ingest sources eval eval-answers chat eval-agent api ui app
 
 help:
 	@grep -hE '^[a-z-]+:.*## ' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  %-12s %s\n", $$1, $$2}'
@@ -53,6 +53,12 @@ eval-agent: ## grade the agent: tool choice, numbers, citations, abstention (~4 
 
 api: ## HTTP API on API_HOST:API_PORT (docs at /docs)
 	$(PY) -m jarvis_rag.api
+
+ui: ## web UI on UI_HOST:UI_PORT, talking to the API at API_URL (run `make api` too)
+	$(PY) -m jarvis_rag.ui
+
+app: ## one process: API on API_PORT with the web UI at /ui
+	$(PY) -m jarvis_rag.ui --with-api
 
 test: ## run the test suite (no GPU or Ollama needed)
 	$(PY) -m pytest -q

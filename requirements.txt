@@ -20,6 +20,7 @@ annotated-types==0.8.0
     # via pydantic
 anyio==4.15.1
     # via
+    #   gradio
     #   httpx
     #   httpx2
     #   langsmith
@@ -34,6 +35,8 @@ babel==2.18.0
     # via courlan
 bcrypt==5.0.0
     # via chromadb
+brotli==1.2.0
+    # via gradio
 build==1.6.1
     # via chromadb
 certifi==2026.10.18
@@ -63,7 +66,9 @@ distro==1.9.0
 durationpy==0.11
     # via kubernetes
 fastapi==0.142.2
-    # via -r requirements.in
+    # via
+    #   -r requirements.in
+    #   gradio
 fastembed==0.9.0
     # via -r requirements.in
 filelock==4.2.4
@@ -75,9 +80,19 @@ frozenlist==1.8.0
     #   aiohttp
     #   aiosignal
 fsspec==2026.9.0
-    # via huggingface-hub
+    # via
+    #   gradio-client
+    #   huggingface-hub
 googleapis-common-protos==1.75.5
     # via opentelemetry-exporter-otlp-proto-grpc
+gradio==6.29.1
+    # via -r requirements.in
+gradio-client==2.7.2
+    # via
+    #   gradio
+    #   hf-gradio
+groovy==0.1.2
+    # via gradio
 grpcio==1.84.0
     # via
     #   chromadb
@@ -87,6 +102,8 @@ h11==0.16.0
     #   httpcore
     #   httpcore2
     #   uvicorn
+hf-gradio==0.4.1
+    # via gradio
 hf-xet==1.7.0
     # via huggingface-hub
 htmldate==1.11.0
@@ -101,15 +118,20 @@ httpx==0.28.1
     # via
     #   -r requirements.in
     #   chromadb
+    #   gradio
+    #   gradio-client
     #   huggingface-hub
     #   langchain-core
     #   langgraph-sdk
     #   ollama
+    #   safehttpx
 httpx2==2.14.0
     # via langsmith
 huggingface-hub==1.33.0
     # via
     #   fastembed
+    #   gradio
+    #   gradio-client
     #   tokenizers
 idna==3.20
     # via
@@ -122,6 +144,8 @@ importlib-resources==7.1.0
     # via chromadb
 iniconfig==2.3.1
     # via pytest
+jinja2==3.1.6
+    # via gradio
 jsonpatch==1.36
     # via langchain-core
 jsonpointer==3.4
@@ -184,6 +208,10 @@ lxml-html-clean==0.4.5
     # via lxml
 markdown-it-py==4.2.0
     # via rich
+markupsafe==3.0.4
+    # via
+    #   gradio
+    #   jinja2
 mdurl==0.1.2
     # via markdown-it-py
 mmh3==5.3.1
@@ -199,6 +227,7 @@ numpy==2.5.4
     #   -r requirements.in
     #   chromadb
     #   fastembed
+    #   gradio
     #   langchain-chroma
     #   onnxruntime
     #   pandas
@@ -237,6 +266,7 @@ opentelemetry-semantic-conventions==0.66b1
 orjson==3.13.0
     # via
     #   chromadb
+    #   gradio
     #   langgraph-sdk
     #   langsmith
 ormsgpack==1.13.0
@@ -246,17 +276,23 @@ overrides==7.7.0
 packaging==26.3
     # via
     #   build
+    #   gradio
+    #   gradio-client
     #   huggingface-hub
     #   langchain-core
     #   langsmith
     #   onnxruntime
     #   pytest
 pandas==3.0.6
-    # via -r requirements.in
+    # via
+    #   -r requirements.in
+    #   gradio
 pathspec==1.1.1
     # via -r requirements.in
 pillow==12.3.0
-    # via fastembed
+    # via
+    #   fastembed
+    #   gradio
 pluggy==1.7.0
     # via pytest
 propcache==0.5.4
@@ -278,6 +314,7 @@ pydantic==2.14.1
     # via
     #   chromadb
     #   fastapi
+    #   gradio
     #   kubernetes
     #   langchain
     #   langchain-core
@@ -291,6 +328,8 @@ pydantic-settings==2.16.0
     # via
     #   -r requirements.in
     #   chromadb
+pydub==0.25.1
+    # via gradio
 pygments==2.21.0
     # via
     #   pytest
@@ -314,12 +353,17 @@ python-dotenv==1.2.4
     #   pydantic-settings
     #   uvicorn
 python-multipart==0.0.32
-    # via -r requirements.in
+    # via
+    #   -r requirements.in
+    #   gradio
 pytz==2026.5
-    # via dateparser
+    # via
+    #   dateparser
+    #   gradio
 pyyaml==6.0.3
     # via
     #   chromadb
+    #   gradio
     #   huggingface-hub
     #   kubernetes
     #   langchain-core
@@ -349,6 +393,10 @@ rpds-py==2026.9.1
     # via
     #   jsonschema
     #   referencing
+safehttpx==0.1.7
+    # via gradio
+semantic-version==2.10.0
+    # via gradio
 shellingham==1.5.4
     # via typer
 six==1.17.0
@@ -361,6 +409,7 @@ starlette==1.7.0
     # via
     #   -r requirements.in
     #   fastapi
+    #   gradio
 tenacity==9.2.1
     # via
     #   chromadb
@@ -371,6 +420,8 @@ tokenizers==0.23.3
     # via
     #   chromadb
     #   fastembed
+tomlkit==0.14.0
+    # via gradio
 tqdm==4.70.1
     # via
     #   chromadb
@@ -383,7 +434,10 @@ truststore==0.10.5
     #   httpcore2
     #   httpx2
 typer==0.27.3
-    # via chromadb
+    # via
+    #   chromadb
+    #   gradio
+    #   hf-gradio
 typing-extensions==4.16.0
     # via
     #   aiohttp
@@ -391,6 +445,8 @@ typing-extensions==4.16.0
     #   anyio
     #   chromadb
     #   fastapi
+    #   gradio
+    #   gradio-client
     #   grpcio
     #   httpx2
     #   huggingface-hub
@@ -430,6 +486,7 @@ uvicorn==0.54.0
     # via
     #   -r requirements.in
     #   chromadb
+    #   gradio
 uvloop==0.23.0
     # via uvicorn
 watchfiles==1.3.0

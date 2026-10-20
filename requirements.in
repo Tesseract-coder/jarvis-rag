@@ -19,6 +19,8 @@ fastapi>=0.142,<0.142.3
 starlette>=1.7,<1.8
 uvicorn>=0.40,<1
 python-multipart>=0.0.20,<0.1
+# Phase 6: web UI (pinned to a release >= 2 weeks old at lock time)
+gradio>=6.29,<6.30
 # Phase 4: persistent conversation memory (SqliteSaver)
 langgraph-checkpoint-sqlite>=3.1,<4
 httpx
