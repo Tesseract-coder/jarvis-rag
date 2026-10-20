@@ -4,7 +4,13 @@ langchain>=1.4,<2
 langchain-core>=1.6,<2
 langchain-ollama>=1.1,<2
 langchain-chroma>=1.1,<2
+langchain-text-splitters>=1.1,<2
 pydantic-settings>=2.16,<3
+# Phase 2: loaders
+pypdf>=6,<7
+trafilatura>=2.3,<3
+pandas>=3,<4
+pathspec>=1,<2
 httpx
 numpy
 pytest

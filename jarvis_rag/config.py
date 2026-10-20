@@ -34,12 +34,25 @@ class Settings(BaseSettings):
     temperature: float = 0.2
     reasoning: bool = False
     keep_alive: int = 1800  # seconds
+    # Instruction prefixes the embedding model was trained with (nomic-embed-text's
+    # are below; set both to "" for models without them). Queries and documents
+    # are embedded differently on purpose.
+    embed_query_prefix: str = "search_query: "
+    embed_document_prefix: str = "search_document: "
 
     # Chunking
     chunk_size: int = 800
     chunk_overlap: int = 120
     code_chunk_size: int = 1200
     code_chunk_overlap: int = 150
+
+    # Vector store
+    collection_name: str = "jarvis"
+
+    # Ingestion limits
+    max_file_mb: float = 20.0
+    url_max_pages: int = 25
+    user_agent: str = "jarvis-rag (self-hosted RAG ingester)"
 
     # Paths
     data_dir: Path = Path("data")

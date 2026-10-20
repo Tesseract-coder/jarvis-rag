@@ -4,12 +4,13 @@
 code, websites and CSVs. Built in phases as a learn-by-building project; teaching notes
 live in [`docs/`](docs/).
 
-> Status: **Phase 1: from scratch** ✅
+> Status: **Phase 2: ingestion + Chroma** ✅
 
 | Phase | Notes |
 |---|---|
 | 0: Environment | [docs/phase-0.md](docs/phase-0.md) |
 | 1: LLM calls, embeddings, vector DB, RAG and an agent loop with no frameworks | [docs/phase-1.md](docs/phase-1.md) |
+| 2: Ingestion (PDF, DOCX, Markdown, code, URLs, CSV→SQLite) into Chroma | [docs/phase-2.md](docs/phase-2.md) |
 
 ## Quick start
 
@@ -22,6 +23,25 @@ make check          # environment doctor
 make test           # no GPU/Ollama needed
 ```
 
+## Ingest your data
+
+Put files in `data/docs` (PDF, DOCX, Markdown, text), code in `data/code`, CSVs in
+`data/csv`, then:
+
+```bash
+make demo-data      # optional: a small demo corpus to try everything on
+make ingest         # idempotent: re-run after any change, only changed chunks are embedded
+make sources        # list what's indexed
+
+.venv/bin/python -m jarvis_rag.ingest --url https://example.com/docs --crawl-depth 1
+.venv/bin/python -m jarvis_rag.ingest --path ~/projects/my-repo     # respects .gitignore
+.venv/bin/python -m jarvis_rag.ingest --delete https://example.com/docs
+.venv/bin/python -m jarvis_rag.vectorstore "how do I reset E-217?" -k 3 --type docx
+```
+
+CSVs become SQLite tables in `storage/jarvis.db` (only their schema is embedded).
+Vectors live in `storage/chroma`.
+
 ## Learn by building
 
 `learn/` rebuilds each core idea with nothing but HTTP calls and numpy:
@@ -33,6 +53,7 @@ make test           # no GPU/Ollama needed
 .venv/bin/python learn/04_rag_without_framework.py   # chunk -> embed -> retrieve -> cite
 .venv/bin/python learn/05_agent_loop_from_scratch.py # the tool-calling loop behind every agent
 .venv/bin/python learn/06_chunking_experiments.py    # chunk size/overlap vs hit@k and MRR
+.venv/bin/python learn/07_chroma_tour.py             # Chroma: collections, metrics, persistence, filters
 ```
 
 All configuration lives in `.env` (see [`.env.example`](.env.example)).

@@ -1,11 +1,11 @@
 import pytest
-from langchain_core.embeddings import DeterministicFakeEmbedding
+from langchain_core.embeddings import DeterministicFakeEmbedding, Embeddings
 from langchain_core.language_models.fake_chat_models import GenericFakeChatModel
 from langchain_core.messages import AIMessage
 from langchain_ollama import ChatOllama, OllamaEmbeddings
 
 from jarvis_rag.config import Settings
-from jarvis_rag.llm import get_chat_model, get_embeddings
+from jarvis_rag.llm import PrefixedEmbeddings, get_chat_model, get_embeddings
 
 
 def test_chat_model_carries_settings():
@@ -22,8 +22,27 @@ def test_chat_model_override_name():
 
 def test_embeddings_run_on_cpu_by_default():
     e = get_embeddings(Settings(_env_file=None))
-    assert isinstance(e, OllamaEmbeddings)
-    assert (e.model, e.num_gpu) == ("nomic-embed-text", 0)
+    assert isinstance(e.inner, OllamaEmbeddings)
+    assert (e.inner.model, e.inner.num_gpu) == ("nomic-embed-text", 0)
+    assert (e.query_prefix, e.document_prefix) == ("search_query: ", "search_document: ")
+
+
+def test_prefixes_are_applied_per_side():
+    class Recorder(Embeddings):
+        def embed_documents(self, texts):
+            self.seen = texts
+            return [[0.0]] * len(texts)
+
+        def embed_query(self, text):
+            self.seen = [text]
+            return [0.0]
+
+    rec = Recorder()
+    e = PrefixedEmbeddings(rec, "q: ", "d: ")
+    e.embed_documents(["a", "b"])
+    assert rec.seen == ["d: a", "d: b"]
+    e.embed_query("c")
+    assert rec.seen == ["q: c"]
 
 
 def test_cloud_providers_not_wired_yet():

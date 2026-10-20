@@ -7,8 +7,9 @@ PY := .venv/bin/python
 CHAT_MODEL ?= qwen3:4b-instruct
 FALLBACK_CHAT_MODEL ?= qwen3:1.7b
 EMBED_MODEL ?= nomic-embed-text
+DATA_DIR ?= data
 
-.PHONY: help setup lock pull-models check test
+.PHONY: help setup lock pull-models check test demo-data ingest sources
 
 help:
 	@grep -hE '^[a-z-]+:.*## ' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  %-12s %s\n", $$1, $$2}'
@@ -28,6 +29,15 @@ pull-models: ## pull the chat, fallback and embedding models into Ollama
 
 check: ## environment doctor: GPU, Ollama, models, VRAM, smoke tests
 	$(PY) -m jarvis_rag.check_env
+
+demo-data: ## write the Halcyon demo corpus (md, pdf, docx, csv) into data/
+	$(PY) -m jarvis_rag.demo_data
+
+ingest: ## ingest data/docs, data/code and data/csv (idempotent; re-run any time)
+	$(PY) -m jarvis_rag.ingest --path $(DATA_DIR)/docs --path $(DATA_DIR)/code --csv $(DATA_DIR)/csv
+
+sources: ## list what is in the knowledge base
+	$(PY) -m jarvis_rag.ingest --list
 
 test: ## run the test suite (no GPU or Ollama needed)
 	$(PY) -m pytest -q
