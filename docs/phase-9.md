@@ -7,8 +7,10 @@ built and tested locally first, and the push happens only after the owner decide
 account, keys and visibility.
 
 > **Status:** bundle built and tested locally, exactly as HF runs it (uid 1000, port 7860,
-> secrets as env vars, even with no network). **Not yet pushed:** waiting for an HF login,
-> a provider key, and the private/public decision. See "Deploying" below.
+> secrets as env vars, even with no network). **Not deployed: Hugging Face now requires a
+> paid PRO subscription to host Docker (and Gradio) Spaces**, even on the basic CPU tier.
+> This project uses no paid services, so the Space stays a ready-to-push bundle. See
+> "What happened when we pushed" below.
 
 ```bash
 make space          # assemble build/hf-space: exactly what would be published
@@ -111,7 +113,7 @@ eval questions out of the documents being searched.
 Not yet tested: a real answer from Groq on HF's own infrastructure. That needs the key and
 the push.
 
-## Deploying (needs your decisions)
+## Deploying (needs a PRO account; see the next section)
 
 1. **Account and login.** Create a free account at huggingface.co, then in *your own
    terminal* (it's interactive): `hf auth login` with a token that has **write**
@@ -126,6 +128,47 @@ the push.
    there too.
 5. Updating: `make space-push SPACE=…` again. `--exist-ok` keeps the Space and replaces
    the files; each push is a commit in the Space repo, tagged with the local git hash.
+
+## What happened when we pushed
+
+Everything up to the push worked:
+- `hf auth login` (token with write permission).
+- `.space-secrets` filled in.
+- The Groq key checked locally first: `make providers` → `groq --ping` → "ready" in 0.6 s,
+  and a correct tool call in 0.2 s.
+
+Then `hf repos create … --type space --sdk docker --private` returned:
+
+```
+Error: Client error '402 Payment Required' for url 'https://huggingface.co/api/repos/create'
+Static Spaces are free for everyone, but hosting Gradio and Docker Spaces on free cpu-basic
+requires a PRO subscription.
+```
+
+Nothing was created or uploaded. The repo creation failed before any file or secret was
+sent (checked afterwards: `repo_exists` → False, no Spaces on the account). The
+documentation pages read earlier the same day still described `cpu-basic` as the free
+default. Pricing pages and API behaviour can change before docs do, and the API is
+the authority.
+
+What remains true and useful:
+- The bundle is a complete Docker Space. With PRO (or on an organisation that has it),
+  `make space-push SPACE=<user>/jarvis-rag` deploys it unchanged, and the eval gate runs
+  on HF's builder too.
+- The same image runs on any Docker host: `make space-test`, then `docker run` with the
+  three secrets.
+- A *static* Space (free) can't run this app: retrieval, the reranker and the agent need a
+  Python server.
+
+Free alternatives considered, not done:
+- **A free tunnel to the local Docker app** (`cloudflare/cloudflared` as a container,
+  with `API_KEY`, `UI_PASSWORD` and `KB_READ_ONLY`). It works only while the PC is on,
+  and it exposes the machine.
+- **Other free container hosts.** Most now require a payment card or offer about 512 MB
+  of RAM, against the ~1.5 GB this app uses.
+
+If you're done with it, delete `.space-secrets`: it holds your Groq key (gitignored,
+mode 600).
 
 ## Tests (+4, 223 total)
 

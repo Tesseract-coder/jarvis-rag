@@ -4,7 +4,7 @@
 code, websites and CSVs. Built in phases as a learn-by-building project; teaching notes
 live in [`docs/`](docs/).
 
-> Status: **Phase 9: Hugging Face Space** (built and tested locally; deploy with `make space-push`)
+> Status: **Phase 9: Hugging Face Space bundle** ✅ (tested locally; hosting Docker Spaces now needs HF PRO, so not deployed)
 
 | Phase | Notes |
 |---|---|
