@@ -31,3 +31,17 @@ def test_runs_unprivileged_and_read_only():
 def test_only_loopback_ports_are_published():
     for port in re.findall(r'-\s*"([^"]+:\d+)"', COMPOSE):
         assert port.startswith("127.0.0.1:"), port
+
+
+def test_space_bundle_contains_only_what_should_be_published(tmp_path):
+    import subprocess
+
+    subprocess.run([str(ROOT / "deploy" / "build_space.sh")], check=True, capture_output=True)
+    out = ROOT / "build" / "hf-space"
+    files = {p.relative_to(out).as_posix() for p in out.rglob("*") if p.is_file()}
+    assert {"Dockerfile", "README.md", "requirements.txt", "jarvis_rag/api.py", "eval/qa_set.jsonl",
+            "learn/sample_docs/product_specs.md"} <= files
+    assert not any(f.startswith((".env", "storage/", "data/", ".git", ".space-secrets")) for f in files)
+    assert "sdk: docker" in (out / "README.md").read_text() and "app_port: 7860" in (out / "README.md").read_text()
+    space_df = (out / "Dockerfile").read_text()
+    assert "--min-hit5" in space_df and "KB_READ_ONLY=true" in space_df and "--require-hashes" in space_df

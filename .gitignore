@@ -19,3 +19,7 @@ storage/
 
 # eval outputs
 eval/results/
+
+# deploy bundles (make space)
+build/
+.space-secrets

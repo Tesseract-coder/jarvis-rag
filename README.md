@@ -4,7 +4,7 @@
 code, websites and CSVs. Built in phases as a learn-by-building project; teaching notes
 live in [`docs/`](docs/).
 
-> Status: **Phase 8: Docker** ✅
+> Status: **Phase 9: Hugging Face Space** (built and tested locally; deploy with `make space-push`)
 
 | Phase | Notes |
 |---|---|
@@ -17,6 +17,7 @@ live in [`docs/`](docs/).
 | 6: Gradio UI: streaming chat with tool steps and checked citations, uploads, source management | [docs/phase-6.md](docs/phase-6.md) |
 | 7: Providers: Groq / Gemini / OpenRouter free tiers, FastEmbed CPU embeddings, local fallback | [docs/phase-7.md](docs/phase-7.md) |
 | 8: Docker: hardened CPU image, Compose with the host's Ollama or fully self-contained | [docs/phase-8.md](docs/phase-8.md) |
+| 9: Hugging Face Space: baked read-only demo, build gated on the retrieval eval | [docs/phase-9.md](docs/phase-9.md) |
 
 ## Quick start
 

@@ -219,6 +219,7 @@ def main() -> None:
     ap.add_argument("--answer-mode", choices=MODES, default=None)
     ap.add_argument("--limit", type=int, help="answer only the first N questions")
     ap.add_argument("--json", type=Path, help="write all results here")
+    ap.add_argument("--min-hit5", type=float, help="exit 1 if any mode's hit@5 is below this (a build gate)")
     args = ap.parse_args()
 
     s = get_settings()
@@ -243,6 +244,11 @@ def main() -> None:
     if args.json:
         args.json.write_text(json.dumps(out, indent=2, ensure_ascii=False))
         print(f"\nwrote {args.json}")
+    if args.min_hit5 is not None:
+        low = {m: summarize(rows)["hit@5"] for m, rows in results.items() if summarize(rows)["hit@5"] < args.min_hit5}
+        if low or bad:
+            sys.exit(f"FAILED gate hit@5 >= {args.min_hit5}: {low or ''} {len(bad)} unreachable gold labels")
+        print(f"gate passed: hit@5 >= {args.min_hit5} in every mode, all gold labels reachable")
 
 
 if __name__ == "__main__":

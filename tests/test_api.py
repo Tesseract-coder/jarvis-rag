@@ -66,7 +66,7 @@ def test_key_required_everywhere_but_health(env, monkeypatch):
     monkeypatch.setattr(api_module.httpx, "get", lambda *a, **k: httpx.Response(200))
     c, _ = client_for(env)
     assert c.get("/health").json() == {"status": "ok", "ollama": True, "provider": "ollama",
-                                       "model": "qwen3:4b-instruct"}
+                                       "model": "qwen3:4b-instruct", "read_only": False}
     for method, path in [("get", "/sources"), ("post", "/chat"), ("delete", "/sources/x")]:
         assert getattr(c, method)(path).status_code == 401
         assert getattr(c, method)(path, headers={"X-API-Key": "wrong"}).status_code == 401
@@ -257,3 +257,20 @@ def test_provider_failures_are_explained_not_leaked(env, exc, status, text):
     assert r.status_code == status and text in r.json()["detail"] and "gsk_secret" not in r.text
     events = sse(c.post("/chat/stream", json={"message": "hi"}, headers=KEY).text)
     assert events[-1][0] == "error" and text in events[-1][1]["message"]
+
+
+def test_read_only_deployment_blocks_every_write(env):
+    c, _ = client_for(env, AIMessage("9 hours [specs.md]"), kb_read_only=True)
+    assert c.post("/ingest/file", headers=KEY, files={"file": ("a.md", b"# A")}).status_code == 403
+    assert c.post("/ingest/url", headers=KEY, json={"url": "https://ex.com/"}).status_code == 403
+    r = c.delete("/sources/specs.md", headers=KEY)
+    assert r.status_code == 403 and "read-only" in r.json()["detail"]
+    assert c.get("/sources", headers=KEY).status_code == 200
+    assert c.post("/chat", headers=KEY, json={"message": "W1 battery?"}).json()["answer"].startswith("9 hours")
+
+
+def test_unreachable_message_names_the_right_service():
+    from jarvis_rag.api import classify_failure
+
+    assert "is Ollama running" in classify_failure(httpx.ConnectError("x"), "ollama")[1]
+    assert "reach groq" in classify_failure(httpx.ConnectError("x"), "groq")[1]

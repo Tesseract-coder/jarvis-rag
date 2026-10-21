@@ -214,7 +214,9 @@ def build_ui(client: JarvisClient, s: Settings | None = None, api_url: str | Non
             gr.Examples(EXAMPLES, inputs=box)
             thread_info = gr.Markdown()
         with gr.Tab("Knowledge base"):
-            with gr.Row():
+            if s.kb_read_only:
+                gr.Markdown("*Read-only deployment: you can browse the sources, not change them.*")
+            with gr.Row(visible=not s.kb_read_only):
                 with gr.Column():
                     files = gr.File(label="Upload files", file_count="multiple",
                                     file_types=sorted(UPLOAD_EXTS))
@@ -228,7 +230,7 @@ def build_ui(client: JarvisClient, s: Settings | None = None, api_url: str | Non
                 summary = gr.Markdown()
                 refresh = gr.Button("Refresh", scale=0)
             table = gr.Dataframe(headers=["source", "type", "chunks", "ingested"], interactive=False, wrap=True)
-            with gr.Row():
+            with gr.Row(visible=not s.kb_read_only):
                 pick = gr.Dropdown(label="Source", choices=[], scale=4)
                 delete = gr.Button("Delete source", variant="stop", scale=1)
 
@@ -291,8 +293,12 @@ def main() -> None:
 
         from jarvis_rag.api import create_app
 
+        from fastapi.responses import RedirectResponse
+
         api_url = f"http://127.0.0.1:{s.api_port}"
-        app = gr.mount_gradio_app(create_app(s), build_ui(JarvisClient(api_url, key), s, api_url), path="/ui",
+        api = create_app(s)
+        api.add_api_route("/", lambda: RedirectResponse("/ui/"), include_in_schema=False)  # Spaces open at "/"
+        app = gr.mount_gradio_app(api, build_ui(JarvisClient(api_url, key), s, api_url), path="/ui",
                                   auth=ui_auth(s, s.api_host), max_file_size=max_size, footer_links=[],
                                   mcp_server=False)
         print(f"API on http://{s.api_host}:{s.api_port}  UI on http://{s.api_host}:{s.api_port}/ui")

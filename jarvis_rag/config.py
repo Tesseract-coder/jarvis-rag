@@ -99,6 +99,7 @@ class Settings(BaseSettings):
     cors_origins: Annotated[list[str], NoDecode] = ["http://localhost:7860", "http://127.0.0.1:7860",
                                                     "http://localhost:3000"]
     max_message_chars: int = 4000
+    kb_read_only: bool = False  # shared/public deployments: chat only, no upload/crawl/delete
     max_crawl_depth: int = 2
 
     # Web UI (Phase 6)

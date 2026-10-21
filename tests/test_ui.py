@@ -164,3 +164,9 @@ def test_client_raises_api_errors(api_client):
     assert e.value.status == 401
     with pytest.raises(ApiError):
         list(JarvisClient(http=api_client, api_key="wrong").chat_stream("hi"))
+
+
+def test_read_only_ui_hides_write_controls():
+    blocks = ui.build_ui(FakeClient(), Settings(_env_file=None, kb_read_only=True))
+    hidden = [b for b in blocks.blocks.values() if type(b).__name__ == "Row" and b.visible is False]
+    assert len(hidden) == 2  # upload/URL row and delete row

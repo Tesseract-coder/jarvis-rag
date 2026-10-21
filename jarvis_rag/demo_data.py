@@ -155,7 +155,10 @@ def write_demo_data(data_dir: Path) -> list[Path]:
     docs.mkdir(parents=True, exist_ok=True)
     csvs.mkdir(parents=True, exist_ok=True)
     written = []
-    for md in sorted((ROOT / "learn" / "sample_docs").glob("*.md")):
+    samples = sorted((ROOT / "learn" / "sample_docs").glob("*.md"))
+    if not samples:  # an empty glob is not an error to Python, but it is a broken corpus
+        raise FileNotFoundError(f"no Markdown demo docs in {ROOT / 'learn' / 'sample_docs'}")
+    for md in samples:
         written.append(Path(shutil.copy(md, docs / md.name)))
     write_pdf(docs / "safety_report_2026.pdf", SAFETY_REPORT, title="Halcyon Robotics 2026 Safety Report")
     write_docx(docs / "kestrel_k2_maintenance.docx", MAINTENANCE_MANUAL)

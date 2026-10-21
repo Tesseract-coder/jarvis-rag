@@ -9,7 +9,7 @@ FALLBACK_CHAT_MODEL ?= qwen3:1.7b
 EMBED_MODEL ?= nomic-embed-text
 DATA_DIR ?= data
 
-.PHONY: help setup lock pull-models check test demo-data ingest sources eval eval-answers chat eval-agent api ui app providers docker-build docker-up docker-down docker-logs docker-ingest
+.PHONY: help setup lock pull-models check test demo-data ingest sources eval eval-answers chat eval-agent api ui app providers docker-build docker-up docker-down docker-logs docker-ingest space space-test space-push
 
 help:
 	@grep -hE '^[a-z-]+:.*## ' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  %-12s %s\n", $$1, $$2}'
@@ -77,6 +77,21 @@ docker-logs: ## follow the container logs
 
 docker-ingest: ## ingest data/ from inside the image (stop docker-up first, or use POST /ingest/file)
 	docker compose run --rm jarvis python -m jarvis_rag.ingest --path data/docs --path data/code --csv data/csv
+
+space: ## assemble the Hugging Face Space bundle in build/hf-space (nothing is uploaded)
+	deploy/build_space.sh
+
+space-test: space ## build the Space image and run it locally the way HF does (uid 1000, port 7860)
+	docker build -t jarvis-space build/hf-space
+	@echo "run: docker run --rm -p 127.0.0.1:7860:7860 --user 1000 -e API_KEY=... -e UI_PASSWORD=... -e GROQ_API_KEY=... jarvis-space"
+
+space-push: space ## create/update the Space (needs: hf auth login, SPACE=user/name, .space-secrets); private unless PUBLIC=1
+	@test -n "$(SPACE)" || (echo "usage: make space-push SPACE=your-hf-user/jarvis-rag [PUBLIC=1]" && exit 2)
+	@test -f .space-secrets || (echo "missing .space-secrets: cp deploy/hf-space/secrets.example .space-secrets and fill it in" && exit 2)
+	.venv/bin/hf auth whoami
+	.venv/bin/hf repos create $(SPACE) --type space --sdk docker $(if $(PUBLIC),--public,--private) --secrets-file .space-secrets --exist-ok
+	.venv/bin/hf upload $(SPACE) build/hf-space . --repo-type space --commit-message "Deploy JARVIS $$(git rev-parse --short HEAD)"
+	@echo "Building on HF: https://huggingface.co/spaces/$(SPACE)  (app: https://$$(echo $(SPACE) | tr '/' '-').hf.space/ui/)"
 
 test: ## run the test suite (no GPU or Ollama needed)
 	$(PY) -m pytest -q

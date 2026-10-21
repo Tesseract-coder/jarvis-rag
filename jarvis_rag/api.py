@@ -136,7 +136,8 @@ def classify_failure(exc: Exception, provider: str) -> tuple[int, str]:
     if "RateLimit" in name or "ResourceExhausted" in name or code == 429:
         return 503, f"the LLM provider ({provider}) is rate-limiting requests: retry shortly, or set LLM_FALLBACK"
     if "Connect" in name or "Timeout" in name:
-        return 503, f"a model service is unreachable ({name}): is Ollama running / is the network up?"
+        where = "is Ollama running?" if provider == "ollama" else f"can this server reach {provider}?"
+        return 503, f"a model service is unreachable ({name}): {where}"
     return 500, f"internal error ({name})"
 
 
@@ -266,6 +267,10 @@ def create_app(settings: Settings | None = None, kb: KnowledgeBase | None = None
         status, detail = classify_failure(exc, s.llm_provider)
         return JSONResponse({"detail": detail}, status_code=status)
 
+    def writable() -> None:
+        if s.kb_read_only:
+            raise HTTPException(403, "the knowledge base is read-only on this deployment (KB_READ_ONLY=true)")
+
     def check_message(req: ChatRequest) -> str:
         if len(req.message) > s.max_message_chars:
             raise HTTPException(422, f"message longer than {s.max_message_chars} characters")
@@ -282,7 +287,7 @@ def create_app(settings: Settings | None = None, kb: KnowledgeBase | None = None
                 ollama = False
         ok = ollama is not False
         return JSONResponse({"status": "ok" if ok else "degraded", "ollama": ollama, "provider": s.llm_provider,
-                             "model": model_name(s)},
+                             "model": model_name(s), "read_only": s.kb_read_only},
                             status_code=200 if ok else 503)
 
     # ---- chat
@@ -339,7 +344,7 @@ def create_app(settings: Settings | None = None, kb: KnowledgeBase | None = None
         return out
 
     # ---- ingestion
-    @app.post("/ingest/file", response_model=IngestResponse, dependencies=auth)
+    @app.post("/ingest/file", response_model=IngestResponse, dependencies=[*auth, Depends(writable)])
     def ingest_file(file: Annotated[UploadFile, File(description="pdf, docx, md, txt, code or csv")]):
         name = safe_filename(file.filename)
         if Path(name).suffix.lower() not in UPLOAD_EXTS:
@@ -356,7 +361,7 @@ def create_app(settings: Settings | None = None, kb: KnowledgeBase | None = None
                                          + "; ".join(why for _, why in skipped))
             return ingest_response(ingest_documents(docs, kb, s), skipped)
 
-    @app.post("/ingest/url", response_model=IngestResponse, dependencies=auth)
+    @app.post("/ingest/url", response_model=IngestResponse, dependencies=[*auth, Depends(writable)])
     def ingest_url(req: UrlRequest):
         if req.crawl_depth > s.max_crawl_depth:
             raise HTTPException(422, f"crawl_depth must be <= {s.max_crawl_depth}")
@@ -371,7 +376,7 @@ def create_app(settings: Settings | None = None, kb: KnowledgeBase | None = None
     def sources():
         return [SourceInfo(source=src, **info) for src, info in kb.sources().items()]
 
-    @app.delete("/sources/{source:path}", response_model=DeleteResponse, dependencies=auth)
+    @app.delete("/sources/{source:path}", response_model=DeleteResponse, dependencies=[*auth, Depends(writable)])
     def delete_source(source: str):
         """`source` exactly as /sources lists it; URL-encode it (a URL source contains "://")."""
         with write_lock:
