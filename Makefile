@@ -9,7 +9,7 @@ FALLBACK_CHAT_MODEL ?= qwen3:1.7b
 EMBED_MODEL ?= nomic-embed-text
 DATA_DIR ?= data
 
-.PHONY: help setup lock pull-models check test demo-data ingest sources eval eval-answers chat eval-agent api ui app providers
+.PHONY: help setup lock pull-models check test demo-data ingest sources eval eval-answers chat eval-agent api ui app providers docker-build docker-up docker-down docker-logs docker-ingest
 
 help:
 	@grep -hE '^[a-z-]+:.*## ' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  %-12s %s\n", $$1, $$2}'
@@ -20,7 +20,7 @@ setup: ## create .venv (Python 3.12) and install pinned deps; create .env
 	@test -f .env || (cp .env.example .env && echo "created .env from .env.example")
 
 lock: ## re-resolve requirements.in -> requirements.txt
-	uv pip compile requirements.in -o requirements.txt --python-version 3.12
+	uv pip compile requirements.in -o requirements.txt --python-version 3.12 --generate-hashes
 
 pull-models: ## pull the chat, fallback and embedding models into Ollama
 	ollama pull $(CHAT_MODEL)
@@ -62,6 +62,21 @@ app: ## one process: API on API_PORT with the web UI at /ui
 
 providers: ## list models your API keys can use (+ free OpenRouter models); PING=1 to test calls
 	$(PY) -m jarvis_rag.providers $(if $(PING),--ping)
+
+docker-build: ## build the jarvis-rag image (CPU; hash-locked deps, pinned base images)
+	docker compose build jarvis
+
+docker-up: ## run API + UI in Docker on 127.0.0.1:8000, using the host's Ollama
+	docker compose up -d jarvis && echo "UI: http://127.0.0.1:8000/ui   API docs: http://127.0.0.1:8000/docs"
+
+docker-down: ## stop the containers
+	docker compose --profile cpu down
+
+docker-logs: ## follow the container logs
+	docker compose logs -f jarvis
+
+docker-ingest: ## ingest data/ from inside the image (stop docker-up first, or use POST /ingest/file)
+	docker compose run --rm jarvis python -m jarvis_rag.ingest --path data/docs --path data/code --csv data/csv
 
 test: ## run the test suite (no GPU or Ollama needed)
 	$(PY) -m pytest -q

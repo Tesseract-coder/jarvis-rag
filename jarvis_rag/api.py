@@ -17,6 +17,7 @@ Without API_KEY the server refuses to bind to anything but localhost.
 """
 
 import ipaddress
+import json
 import logging
 import re
 import secrets
@@ -124,6 +125,21 @@ def is_loopback(host: str) -> bool:
         return False
 
 
+def classify_failure(exc: Exception, provider: str) -> tuple[int, str]:
+    """Turn a model/provider failure into a status and a message a user can act on,
+    without echoing the exception text (which can carry URLs, keys, paths). Matched
+    by name and status code, because every SDK has its own AuthenticationError class."""
+    name = type(exc).__name__
+    code = getattr(exc, "status_code", None) or getattr(exc, "code", None)
+    if "Authentication" in name or "PermissionDenied" in name or code in (401, 403):
+        return 502, f"the LLM provider ({provider}) rejected the credentials: check its API key"
+    if "RateLimit" in name or "ResourceExhausted" in name or code == 429:
+        return 503, f"the LLM provider ({provider}) is rate-limiting requests: retry shortly, or set LLM_FALLBACK"
+    if "Connect" in name or "Timeout" in name:
+        return 503, f"a model service is unreachable ({name}): is Ollama running / is the network up?"
+    return 500, f"internal error ({name})"
+
+
 def safe_filename(name: str | None) -> str:
     """Browser-supplied names can be "../../.bashrc" or "C:\\x\\y.pdf": keep the last
     path component, then only boring characters."""
@@ -157,6 +173,60 @@ def ingest_response(results, skipped) -> IngestResponse:
         skipped=[{"what": w, "why": y} for w, y in skipped])
 
 
+class BodySizeLimit:
+    """Pure ASGI middleware: refuse request bodies over `max_bytes` *before* Starlette
+    spools them to a temp file (Phase 5's open gap). Checks Content-Length up front,
+    and counts the bytes of chunked uploads that don't declare one.
+
+    For the counted case we can't raise: FastAPI's body parser would catch it and
+    answer 400. So we answer 413 ourselves, tell the app the client disconnected,
+    and drop whatever the app tries to send afterwards."""
+
+    def __init__(self, app, max_bytes: int):
+        self.app, self.max_bytes = app, max_bytes
+
+    async def __call__(self, scope, receive, send):
+        if scope["type"] != "http":
+            return await self.app(scope, receive, send)
+        length = dict(scope["headers"]).get(b"content-length")
+        if length and length.isdigit() and int(length) > self.max_bytes:
+            return await self._reject(send)
+        received, started, rejected = 0, False, False
+
+        async def counting_receive():
+            nonlocal received, rejected
+            if rejected:
+                return {"type": "http.disconnect"}
+            message = await receive()
+            if message["type"] == "http.request":
+                received += len(message.get("body", b""))
+                if received > self.max_bytes:
+                    rejected = True
+                    if not started:
+                        await self._reject(send)
+                    return {"type": "http.disconnect"}
+            return message
+
+        async def guarded_send(message):
+            nonlocal started
+            if rejected:
+                return  # our 413 already went out
+            started = started or message["type"] == "http.response.start"
+            await send(message)
+
+        try:
+            await self.app(scope, counting_receive, guarded_send)
+        except Exception:
+            if not rejected:
+                raise  # a real error; a ClientDisconnect after our 413 is expected
+
+    async def _reject(self, send):
+        body = json.dumps({"detail": f"request body larger than {self.max_bytes // 1_000_000} MB"}).encode()
+        await send({"type": "http.response.start", "status": 413,
+                    "headers": [(b"content-type", b"application/json"), (b"connection", b"close")]})
+        await send({"type": "http.response.body", "body": body})
+
+
 # --------------------------------------------------------------------------- app
 
 def create_app(settings: Settings | None = None, kb: KnowledgeBase | None = None, agent=None,
@@ -175,6 +245,8 @@ def create_app(settings: Settings | None = None, kb: KnowledgeBase | None = None
 
     app = FastAPI(title=f"{s.agent_name} API", version="0.5.0",
                   description="Local RAG agent: chat with your documents, code and tables.")
+    # The largest legitimate body is one upload plus multipart framing.
+    app.add_middleware(BodySizeLimit, max_bytes=int(s.max_file_mb * 1e6) + 1_000_000)
     app.add_middleware(CORSMiddleware, allow_origins=s.cors_origins, allow_methods=["GET", "POST", "DELETE"],
                        allow_headers=["X-API-Key", "Content-Type"], allow_credentials=False)
 
@@ -191,7 +263,8 @@ def create_app(settings: Settings | None = None, kb: KnowledgeBase | None = None
     @app.exception_handler(Exception)
     def internal_error(request: Request, exc: Exception) -> JSONResponse:
         log.exception("unhandled error on %s %s", request.method, request.url.path)
-        return JSONResponse({"detail": f"internal error ({type(exc).__name__})"}, status_code=500)
+        status, detail = classify_failure(exc, s.llm_provider)
+        return JSONResponse({"detail": detail}, status_code=status)
 
     def check_message(req: ChatRequest) -> str:
         if len(req.message) > s.max_message_chars:
@@ -246,7 +319,7 @@ def create_app(settings: Settings | None = None, kb: KnowledgeBase | None = None
                 yield ServerSentEvent(event=kind, data=ev)
         except Exception as e:  # headers are already sent: report in-band, don't drop the stream
             log.exception("chat stream failed")
-            yield ServerSentEvent(event="error", data={"message": f"internal error ({type(e).__name__})"})
+            yield ServerSentEvent(event="error", data={"message": classify_failure(e, s.llm_provider)[1]})
 
     @app.get("/threads/{thread_id}", response_model=list[ThreadMessage], dependencies=auth)
     def thread(thread_id: Annotated[str, FastApiPath(pattern=THREAD_ID)]):

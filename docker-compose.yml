@@ -1,0 +1,58 @@
+# Two ways to run the same image. Settings come from .env, like everywhere else.
+#
+#   docker compose up -d jarvis           # uses the Ollama already running on this machine (GPU)
+#   docker compose --profile cpu up -d jarvis-cpu   # self-contained: FastEmbed + a hosted LLM
+#
+#   docker compose run --rm jarvis python -m jarvis_rag.ingest --path data/docs --csv data/csv
+#
+# Both bind-mount ./storage and ./data, so the container sees the same index, tables,
+# conversations and uploads as `make app` on the host. Run one or the other, not both
+# at once: two processes writing the same Chroma directory is not safe.
+
+x-hardening: &hardening
+  init: true                       # tini as PID 1: forwards SIGTERM, reaps zombies
+  user: "${UID:-1000}:${GID:-1000}"  # your uid, so files written to ./storage stay yours
+  read_only: true                  # only the volumes and /tmp are writable
+  tmpfs:
+    - /tmp:size=1g                 # Gradio upload staging, HOME, caches
+  cap_drop: [ALL]
+  security_opt: ["no-new-privileges:true"]
+  volumes:
+    - ./storage:/app/storage
+    - ./data:/app/data
+  restart: unless-stopped
+
+services:
+  # Host network: the container shares the host's network stack, so 127.0.0.1:11434 is
+  # the host's Ollama (which only listens on loopback) and the app listens on the
+  # host's 127.0.0.1:8000. No Ollama reconfiguration, nothing exposed to the LAN.
+  # Linux only (Docker Desktop on macOS/Windows: use host.docker.internal instead).
+  jarvis:
+    <<: *hardening
+    build: .
+    image: jarvis-rag:latest
+    network_mode: host
+    env_file: [{path: .env, required: false}]
+    environment:
+      API_HOST: 127.0.0.1
+      OLLAMA_BASE_URL: http://127.0.0.1:11434
+
+  # Bridge network + published port: no access to the host's Ollama, so embeddings run
+  # in-process (FastEmbed nomic, same vectors as Ollama's: the index is reused) and the
+  # LLM is hosted. Inside the container the app must listen on 0.0.0.0, and the app
+  # can't know the port is published on loopback only, so it refuses to start without
+  # API_KEY and UI_PASSWORD in .env. (Compose's ${VAR:?} can't enforce that here: it is
+  # evaluated for every service in the file, profile or not.)
+  jarvis-cpu:
+    <<: *hardening
+    profiles: [cpu]
+    image: jarvis-rag:latest
+    build: .
+    ports:
+      - "127.0.0.1:8000:8000"
+    env_file: [{path: .env, required: false}]
+    environment:
+      API_HOST: 0.0.0.0
+      EMBED_PROVIDER: fastembed
+      LLM_PROVIDER: ${CPU_LLM_PROVIDER:-groq}
+      LLM_FALLBACK: ""

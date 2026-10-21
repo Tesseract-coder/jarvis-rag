@@ -4,7 +4,7 @@
 code, websites and CSVs. Built in phases as a learn-by-building project; teaching notes
 live in [`docs/`](docs/).
 
-> Status: **Phase 7: provider switch** ✅
+> Status: **Phase 8: Docker** ✅
 
 | Phase | Notes |
 |---|---|
@@ -16,6 +16,7 @@ live in [`docs/`](docs/).
 | 5: FastAPI: chat, SSE streaming, ingestion, sources, API key, CORS, Python/JS clients | [docs/phase-5.md](docs/phase-5.md) |
 | 6: Gradio UI: streaming chat with tool steps and checked citations, uploads, source management | [docs/phase-6.md](docs/phase-6.md) |
 | 7: Providers: Groq / Gemini / OpenRouter free tiers, FastEmbed CPU embeddings, local fallback | [docs/phase-7.md](docs/phase-7.md) |
+| 8: Docker: hardened CPU image, Compose with the host's Ollama or fully self-contained | [docs/phase-8.md](docs/phase-8.md) |
 
 ## Quick start
 
@@ -81,6 +82,13 @@ make providers                             # which models your keys can use toda
 ```
 
 Hosted providers see your questions and the retrieved document chunks. Keep private data on Ollama.
+
+Or run it in Docker (no GPU toolkit needed: the container uses the Ollama already on your machine):
+
+```bash
+make docker-build && make docker-up        # http://127.0.0.1:8000/ui, same storage/ and data/ as on the host
+docker compose --profile cpu up -d jarvis-cpu   # self-contained: FastEmbed + hosted LLM (needs API_KEY, UI_PASSWORD)
+```
 
 Use it in the browser:
 

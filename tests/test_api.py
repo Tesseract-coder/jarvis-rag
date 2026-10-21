@@ -215,3 +215,45 @@ def test_cors_preflight(env):
     assert ok.headers["access-control-allow-origin"] == "http://localhost:7860"
     bad = c.options("/chat", headers={"Origin": "https://evil.example", "Access-Control-Request-Method": "POST"})
     assert "access-control-allow-origin" not in bad.headers
+
+
+def test_body_size_limit_rejects_before_parsing(env):
+    c, _ = client_for(env)  # max_file_mb=0.01 -> limit 1.01 MB
+    big = b"x" * 1_100_000
+    r = c.post("/ingest/file", headers=KEY, files={"file": ("big.md", big)})
+    assert r.status_code == 413 and "larger than" in r.json()["detail"]
+
+    def chunked():  # no Content-Length: the byte counter has to catch it
+        for _ in range(12):
+            yield b"y" * 100_000
+
+    r = c.post("/chat", headers=KEY | {"content-type": "application/json"}, content=chunked())
+    assert r.status_code == 413
+    assert c.post("/chat", headers=KEY, json={"message": "x" * 10}).status_code != 413
+
+
+class AuthenticationError(Exception):  # named like the groq/openai SDK classes
+    status_code = 401
+
+
+class RateLimitError(Exception):
+    status_code = 429
+
+
+@pytest.mark.parametrize("exc,status,text", [
+    (AuthenticationError("Invalid API Key gsk_secret"), 502, "rejected the credentials"),
+    (RateLimitError("slow down"), 503, "rate-limiting"),
+    (httpx.ConnectError("refused"), 503, "unreachable"),
+    (KeyError("x"), 500, "internal error (KeyError)"),
+])
+def test_provider_failures_are_explained_not_leaked(env, exc, status, text):
+    class Failing:
+        def stream(self, *a, **k):
+            raise exc
+
+    s, kb = env
+    c = TestClient(create_app(s, kb=kb, agent=Failing()), raise_server_exceptions=False)
+    r = c.post("/chat", json={"message": "hi"}, headers=KEY)
+    assert r.status_code == status and text in r.json()["detail"] and "gsk_secret" not in r.text
+    events = sse(c.post("/chat/stream", json={"message": "hi"}, headers=KEY).text)
+    assert events[-1][0] == "error" and text in events[-1][1]["message"]

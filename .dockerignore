@@ -1,0 +1,15 @@
+# Only requirements.txt and jarvis_rag/ are copied; everything else stays out of the
+# build context. Secrets and user data especially: a COPY . . would bake them in.
+.env
+.env.*
+!.env.example
+storage/
+data/
+.venv/
+.git/
+ollama-install/
+eval/results/
+**/__pycache__/
+**/*.pyc
+.pytest_cache/
+docs/img/
