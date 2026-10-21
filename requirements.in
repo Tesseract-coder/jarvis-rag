@@ -19,6 +19,10 @@ fastapi>=0.142,<0.142.3
 starlette>=1.7,<1.8
 uvicorn>=0.40,<1
 python-multipart>=0.0.20,<0.1
+# Phase 7: hosted LLM providers (free tiers; optional, chosen with LLM_PROVIDER)
+langchain-groq>=1.1,<1.2
+langchain-google-genai>=4.4,<4.4.1
+langchain-openai>=1.6,<1.6.8  # OpenRouter is OpenAI-compatible; langchain-openrouter pins pydantic<2.13
 # Phase 6: web UI (pinned to a release >= 2 weeks old at lock time)
 gradio>=6.29,<6.30
 # Phase 4: persistent conversation memory (SqliteSaver)
@@ -26,3 +30,8 @@ langgraph-checkpoint-sqlite>=3.1,<4
 httpx
 numpy
 pytest
+# Transitive pins: hold back releases younger than two weeks at lock time (2026-10-20).
+google-genai<2.29
+google-auth<2.61
+pycparser<3.1
+openai<=3.24.0

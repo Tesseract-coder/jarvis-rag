@@ -179,3 +179,16 @@ def test_catalogue_refreshes_after_ingest(env):
                                                                  "title": "Parking Guide", "path": "parking.md"})], kb, s)
     ask(agent, "q2", "t")
     assert "Parking Guide" not in model.seen[0][0].content and "Parking Guide" in model.seen[1][0].content
+
+
+def test_fallback_model_takes_over_when_the_primary_fails(env):
+    class RateLimited(ScriptedModel):
+        def _generate(self, messages, stop=None, run_manager=None, **kwargs):
+            raise RuntimeError("429 Too Many Requests")
+
+    s, kb = env
+    local = ScriptedModel(script=[AIMessage("Answered locally.")], seen=[])
+    agent = build_agent(s, model=RateLimited(script=[], seen=[]), kb=kb, checkpointer=InMemorySaver(),
+                        fallback=local)
+    assert ask(agent, "hello?", "t") == "Answered locally."
+    assert len(local.seen) == 1

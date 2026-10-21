@@ -65,7 +65,8 @@ def test_refuses_network_bind_without_key(env):
 def test_key_required_everywhere_but_health(env, monkeypatch):
     monkeypatch.setattr(api_module.httpx, "get", lambda *a, **k: httpx.Response(200))
     c, _ = client_for(env)
-    assert c.get("/health").json() == {"status": "ok", "ollama": True, "model": "qwen3:4b-instruct"}
+    assert c.get("/health").json() == {"status": "ok", "ollama": True, "provider": "ollama",
+                                       "model": "qwen3:4b-instruct"}
     for method, path in [("get", "/sources"), ("post", "/chat"), ("delete", "/sources/x")]:
         assert getattr(c, method)(path).status_code == 401
         assert getattr(c, method)(path, headers={"X-API-Key": "wrong"}).status_code == 401

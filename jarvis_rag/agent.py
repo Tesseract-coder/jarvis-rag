@@ -25,8 +25,8 @@ import uuid
 from collections.abc import Iterator
 
 from langchain.agents import create_agent
-from langchain.agents.middleware import (ModelCallLimitMiddleware, ToolErrorMiddleware, before_agent, dynamic_prompt,
-                                         wrap_model_call)
+from langchain.agents.middleware import (ModelCallLimitMiddleware, ModelFallbackMiddleware, ToolErrorMiddleware,
+                                         before_agent, dynamic_prompt, wrap_model_call)
 from langchain_core.language_models import BaseChatModel
 from langchain_core.messages import AIMessage, AIMessageChunk, HumanMessage, ToolMessage, trim_messages
 from langchain_core.messages.utils import count_tokens_approximately
@@ -203,14 +203,19 @@ def get_checkpointer(s: Settings) -> BaseCheckpointSaver:
 
 
 def build_agent(settings: Settings | None = None, model: BaseChatModel | None = None, kb=None,
-                tools: list[BaseTool] | None = None, checkpointer: BaseCheckpointSaver | None = None):
+                tools: list[BaseTool] | None = None, checkpointer: BaseCheckpointSaver | None = None,
+                fallback: BaseChatModel | None = None):
     """The agent graph. Defaults build everything from settings; tests pass a fake
     model and a knowledge base with fake embeddings."""
     s = settings or get_settings()
     if model is None:
-        from jarvis_rag.llm import get_chat_model
+        from jarvis_rag.llm import get_chat_model, get_fallback_model, model_name
 
         model = get_chat_model(s)
+        fallback = fallback or get_fallback_model(s)
+        if s.llm_provider != "ollama":
+            log.warning("LLM_PROVIDER=%s (%s): questions and retrieved document chunks are sent to %s",
+                        s.llm_provider, model_name(s), s.llm_provider)
     if kb is None and tools is None:
         from jarvis_rag.vectorstore import KnowledgeBase
 
@@ -223,6 +228,8 @@ def build_agent(settings: Settings | None = None, model: BaseChatModel | None = 
     middleware = [kb_prompt(s, kb)] if kb is not None else []
     if s.auto_search and search is not None:
         middleware.append(auto_search(search))
+    if fallback is not None:
+        middleware.append(ModelFallbackMiddleware(fallback))
     middleware += [
         sql_follow_through(),
         history_window(s.history_max_tokens),
@@ -354,12 +361,17 @@ def main() -> None:
 
     s = get_settings()
     thread = uuid.uuid4().hex[:8] if args.new else args.thread
-    agent = build_agent(s)
+    try:
+        agent = build_agent(s)
+    except Exception as e:  # missing API key, embedder mismatch, ...: one clear line, not a traceback
+        sys.exit(f"[error] {e}")
     if args.question:
         run_turn(agent, args.question, thread, args.quiet, s.agent_name)
         return
 
-    print(f"{s.agent_name} online ({s.chat_model}, thread '{thread}', memory: {s.memory_backend}).")
+    from jarvis_rag.llm import model_name
+
+    print(f"{s.agent_name} online ({s.llm_provider}/{model_name(s)}, thread '{thread}', memory: {s.memory_backend}).")
     print("Commands: /new  /thread NAME  /history  /quit\n")
     while True:
         try:

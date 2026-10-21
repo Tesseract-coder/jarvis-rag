@@ -1,4 +1,3 @@
-import pytest
 from langchain_core.embeddings import DeterministicFakeEmbedding, Embeddings
 from langchain_core.language_models.fake_chat_models import GenericFakeChatModel
 from langchain_core.messages import AIMessage
@@ -43,13 +42,6 @@ def test_prefixes_are_applied_per_side():
     assert rec.seen == ["d: a", "d: b"]
     e.embed_query("c")
     assert rec.seen == ["q: c"]
-
-
-def test_cloud_providers_not_wired_yet():
-    with pytest.raises(NotImplementedError):
-        get_chat_model(Settings(_env_file=None, llm_provider="groq"))
-    with pytest.raises(NotImplementedError):
-        get_embeddings(Settings(_env_file=None, embed_provider="fastembed"))
 
 
 def test_fakes_used_by_later_phases_work_offline():

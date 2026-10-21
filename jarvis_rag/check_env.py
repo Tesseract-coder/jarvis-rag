@@ -16,7 +16,7 @@ import httpx
 import numpy as np
 
 from jarvis_rag.config import Settings, get_settings
-from jarvis_rag.llm import get_chat_model, get_embeddings
+from jarvis_rag.llm import get_chat_model, get_embeddings, model_name
 
 MIB = 1024**2
 
@@ -119,8 +119,12 @@ def check_ollama(s: Settings, client: httpx.Client) -> bool:
     report(True, "ollama", f"v{version} at {s.ollama_base_url}")
 
     pulled = {m["name"] for m in client.get("/api/tags").json()["models"]}
-    for role, name in [("chat model", s.chat_model), ("fallback model", s.fallback_chat_model),
-                       ("embed model", s.embed_model)]:
+    needed = []
+    if "ollama" in (s.llm_provider, s.llm_fallback):
+        needed += [("chat model", s.chat_model), ("fallback model", s.fallback_chat_model)]
+    if s.embed_provider == "ollama":
+        needed.append(("embed model", s.embed_model))
+    for role, name in needed:
         ok = _full_name(name) in pulled
         report(ok if role != "fallback model" else (ok or None), role,
                name if ok else f"{name} missing: run `ollama pull {name}`")
@@ -137,22 +141,56 @@ def check_vram_estimate(s: Settings, client: httpx.Client) -> None:
            f" + KV@{s.num_ctx} {est['kv_cache']:.0f} MiB = {est['total']:.0f} MiB (+ compute buffers)")
 
 
-def smoke_chat(s: Settings) -> None:
+def smoke_chat(s: Settings) -> bool:
     start = time.perf_counter()
-    msg = get_chat_model(s).invoke("In one short sentence, who are you?")
+    try:
+        msg = get_chat_model(s).invoke("In one short sentence, who are you?")
+    except Exception as e:  # missing key, 401, 429, no network: say which, don't crash the doctor
+        report(False, "chat smoke test", f"{s.llm_provider}/{model_name(s)}: {type(e).__name__}: {str(e)[:160]}")
+        return False
     wall = time.perf_counter() - start
     meta = msg.response_metadata
-    tok_s = meta["eval_count"] / (meta["eval_duration"] / 1e9)
-    report(True, "chat smoke test",
-           f"{tok_s:.1f} tok/s, load {meta['load_duration'] / 1e9:.1f}s, wall {wall:.1f}s")
-    print(f"      → {msg.content.strip()[:120]!r}")
+    if "eval_count" in meta:  # Ollama reports its own timings
+        detail = (f"{meta['eval_count'] / (meta['eval_duration'] / 1e9):.1f} tok/s, "
+                  f"load {meta['load_duration'] / 1e9:.1f}s, wall {wall:.1f}s")
+    else:
+        out = (msg.usage_metadata or {}).get("output_tokens", 0)
+        detail = f"{s.llm_provider}/{model_name(s)}: {out} tokens in {wall:.1f}s (includes network)"
+    report(True, "chat smoke test", detail)
+    print(f"      → {msg.text.strip()[:120]!r}")
+    return True
+
+
+def smoke_tools(s: Settings) -> None:
+    """The agent is useless if the model can't emit structured tool calls."""
+    from langchain_core.tools import tool
+
+    @tool
+    def calculator(expression: str) -> str:
+        """Evaluate an arithmetic expression exactly."""
+        return expression
+
+    try:
+        msg = get_chat_model(s).bind_tools([calculator]).invoke("Use the calculator tool to compute 37 * 43.")
+    except Exception as e:
+        report(False, "tool-calling", f"{type(e).__name__}: {str(e)[:160]}")
+        return
+    calls = msg.tool_calls
+    report(bool(calls), "tool-calling", f"called {calls[0]['name']}({calls[0]['args']})" if calls
+           else f"model answered in text instead: {msg.text[:80]!r}")
 
 
 def smoke_embed(s: Settings) -> None:
-    vecs = get_embeddings(s).embed_documents(["car", "automobile", "banana"])
+    start = time.perf_counter()
+    try:
+        vecs = get_embeddings(s).embed_documents(["car", "automobile", "banana"])
+    except Exception as e:
+        report(False, "embed smoke test", f"{s.embed_provider}: {type(e).__name__}: {str(e)[:160]}")
+        return
+    model = s.fastembed_model if s.embed_provider == "fastembed" else s.embed_model
     report(True, "embed smoke test",
-           f"dim={len(vecs[0])}  cos(car,automobile)={cosine(vecs[0], vecs[1]):.3f}"
-           f"  cos(car,banana)={cosine(vecs[0], vecs[2]):.3f}")
+           f"{s.embed_provider}/{model} dim={len(vecs[0])}  cos(car,automobile)={cosine(vecs[0], vecs[1]):.3f}"
+           f"  cos(car,banana)={cosine(vecs[0], vecs[2]):.3f}  ({(time.perf_counter() - start) * 1000:.0f} ms)")
 
 
 LLAMA_CACHE_RAM_DEFAULT_MIB = 8192
@@ -196,14 +234,28 @@ def main() -> int:
     s = get_settings()
     print(f"{s.agent_name} environment check\n")
     check_python()
-    check_gpu()
-    with httpx.Client(base_url=s.ollama_base_url, timeout=300) as client:
-        if check_ollama(s, client):
-            check_vram_estimate(s, client)
-            smoke_chat(s)
-            smoke_embed(s)
+    local_llm = s.llm_provider == "ollama"
+    if s.llm_provider != "ollama":
+        report(None, "hosted LLM", f"{s.llm_provider}/{model_name(s)}: prompts, including retrieved document "
+                                   f"chunks, are sent to {s.llm_provider}")
+    if local_llm:
+        check_gpu()
+    uses_ollama = "ollama" in (s.llm_provider, s.embed_provider, s.llm_fallback)
+    ollama_ok = False
+    if uses_ollama:
+        with httpx.Client(base_url=s.ollama_base_url, timeout=300) as client:
+            ollama_ok = check_ollama(s, client)
+            if ollama_ok and local_llm:
+                check_vram_estimate(s, client)
+    if not local_llm or ollama_ok:
+        if smoke_chat(s):
+            smoke_tools(s)
+    if s.embed_provider == "fastembed" or ollama_ok:
+        smoke_embed(s)
+    if local_llm and ollama_ok:
+        with httpx.Client(base_url=s.ollama_base_url, timeout=30) as client:
             check_placement(client)
-            check_prompt_cache_ram()
+        check_prompt_cache_ram()
     print("\nAll checks passed." if _failures == 0 else f"\n{_failures} check(s) failed.")
     return 1 if _failures else 0
 

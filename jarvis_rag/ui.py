@@ -190,7 +190,8 @@ def status_line(client: JarvisClient, s: Settings, api_url: str) -> str:
     except Exception:
         return f"🔴 API unreachable at {api_url}"
     ollama = {True: "Ollama 🟢", False: "Ollama 🔴", None: "cloud LLM"}[h.get("ollama")]
-    return f"{'🟢' if h.get('status') == 'ok' else '🟠'} API {h.get('status')} · {ollama} · model `{h.get('model')}`"
+    return (f"{'🟢' if h.get('status') == 'ok' else '🟠'} API {h.get('status')} · {ollama} · "
+            f"{h.get('provider', 'ollama')} `{h.get('model')}`")
 
 
 # --------------------------------------------------------------------------- layout

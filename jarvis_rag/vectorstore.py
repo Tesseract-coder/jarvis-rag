@@ -12,6 +12,8 @@ Search from the shell:
 
 import argparse
 import hashlib
+import json
+import math
 from collections import Counter
 from dataclasses import dataclass
 from pathlib import Path
@@ -25,8 +27,22 @@ from jarvis_rag.config import Settings, get_settings
 from jarvis_rag.llm import get_embeddings
 
 
+FINGERPRINT_KEY = "embed_fingerprint"
+PROBE = "JARVIS embedding fingerprint: the Kestrel K2 battery lasts 6.5 hours."
+SAME_SPACE = 0.99  # Ollama vs FastEmbed nomic-v1.5: 1.0000; vs its quantized -Q variant: ~0.95
+
+
+class EmbeddingMismatch(RuntimeError):
+    """The collection's vectors came from a different embedding model than the one configured."""
+
+
 def chunk_id(source: str, content: str) -> str:
     return hashlib.sha256(f"{source}\n{content}".encode()).hexdigest()
+
+
+def cosine(a: list[float], b: list[float]) -> float:
+    dot = sum(x * y for x, y in zip(a, b))
+    return dot / (math.sqrt(sum(x * x for x in a)) * math.sqrt(sum(y * y for y in b)) or 1.0)
 
 
 @dataclass
@@ -58,6 +74,29 @@ class KnowledgeBase:
             collection_configuration={"hnsw": {"space": "cosine"}},
         )
         self.collection = self.store._collection  # raw chromadb collection for metadata-only calls
+        self._fingerprint_ok = False
+
+    def check_embeddings(self) -> None:
+        """Refuse to mix vector spaces. Vectors from two embedding models are not
+        comparable, and nothing else would notice: same dimension, valid-looking
+        scores, silently wrong results. So each collection stores the vector of a
+        fixed probe sentence, and every embedder must reproduce it before use.
+        Runs lazily (first search/ingest), so opening a collection never needs a model."""
+        if self._fingerprint_ok:
+            return
+        probe = self.store.embeddings.embed_documents([PROBE])[0]
+        meta = dict(self.collection.metadata or {})
+        if FINGERPRINT_KEY not in meta:  # new collection (or one from before Phase 7): adopt this embedder
+            self.collection.modify(metadata=meta | {FINGERPRINT_KEY: json.dumps([round(x, 6) for x in probe])})
+        else:
+            ref = json.loads(meta[FINGERPRINT_KEY])
+            sim = cosine(ref, probe) if len(ref) == len(probe) else 0.0
+            if sim < SAME_SPACE:
+                raise EmbeddingMismatch(
+                    f"collection {self.collection.name!r} was built with a different embedding model "
+                    f"(dim {len(ref)} vs {len(probe)}, probe similarity {sim:.3f}). Switch EMBED_PROVIDER/"
+                    f"EMBED_MODEL/FASTEMBED_MODEL back, or set a new COLLECTION_NAME and re-ingest.")
+        self._fingerprint_ok = True
 
     def count(self) -> int:
         return self.collection.count()
@@ -80,6 +119,7 @@ class KnowledgeBase:
         if kept:  # same text, so no re-embedding; refresh metadata (line numbers, ingested_at)
             self.collection.update(ids=kept, metadatas=[new[cid].metadata for cid in kept])
         if fresh:
+            self.check_embeddings()
             self.store.add_documents([new[cid] for cid in fresh], ids=fresh)
         return UpsertResult(source, len(new), len(fresh), len(stale))
 
@@ -102,6 +142,7 @@ class KnowledgeBase:
 
     def search(self, query: str, k: int = 5, where: dict | None = None) -> list[tuple[Document, float]]:
         """Top-k chunks with cosine *similarity* (1 = identical direction, 0 = unrelated)."""
+        self.check_embeddings()
         hits = self.store.similarity_search_with_score(query, k=k, filter=where)
         return [(doc, 1 - distance) for doc, distance in hits]  # Chroma returns cosine distance
 

@@ -170,6 +170,7 @@ class Retriever:
         return self.kb.search(query, k, where)
 
     def mmr(self, query: str, k: int, where: dict | None = None) -> Hits:
+        self.kb.check_embeddings()
         docs = self.kb.store.max_marginal_relevance_search(query, k=k, fetch_k=self.s.fetch_k,
                                                            lambda_mult=self.s.mmr_lambda, filter=where)
         return [(d, 1 - n / max(len(docs), 1)) for n, d in enumerate(docs)]  # MMR gives order, not scores

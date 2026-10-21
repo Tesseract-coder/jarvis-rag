@@ -9,7 +9,7 @@ FALLBACK_CHAT_MODEL ?= qwen3:1.7b
 EMBED_MODEL ?= nomic-embed-text
 DATA_DIR ?= data
 
-.PHONY: help setup lock pull-models check test demo-data ingest sources eval eval-answers chat eval-agent api ui app
+.PHONY: help setup lock pull-models check test demo-data ingest sources eval eval-answers chat eval-agent api ui app providers
 
 help:
 	@grep -hE '^[a-z-]+:.*## ' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  %-12s %s\n", $$1, $$2}'
@@ -59,6 +59,9 @@ ui: ## web UI on UI_HOST:UI_PORT, talking to the API at API_URL (run `make api` 
 
 app: ## one process: API on API_PORT with the web UI at /ui
 	$(PY) -m jarvis_rag.ui --with-api
+
+providers: ## list models your API keys can use (+ free OpenRouter models); PING=1 to test calls
+	$(PY) -m jarvis_rag.providers $(if $(PING),--ping)
 
 test: ## run the test suite (no GPU or Ollama needed)
 	$(PY) -m pytest -q

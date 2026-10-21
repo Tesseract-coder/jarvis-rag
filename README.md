@@ -4,7 +4,7 @@
 code, websites and CSVs. Built in phases as a learn-by-building project; teaching notes
 live in [`docs/`](docs/).
 
-> Status: **Phase 6: web UI** ✅
+> Status: **Phase 7: provider switch** ✅
 
 | Phase | Notes |
 |---|---|
@@ -15,6 +15,7 @@ live in [`docs/`](docs/).
 | 4: The agent: `create_agent`, tools (search, SQL, web, calculator), memory, streaming CLI | [docs/phase-4.md](docs/phase-4.md) |
 | 5: FastAPI: chat, SSE streaming, ingestion, sources, API key, CORS, Python/JS clients | [docs/phase-5.md](docs/phase-5.md) |
 | 6: Gradio UI: streaming chat with tool steps and checked citations, uploads, source management | [docs/phase-6.md](docs/phase-6.md) |
+| 7: Providers: Groq / Gemini / OpenRouter free tiers, FastEmbed CPU embeddings, local fallback | [docs/phase-7.md](docs/phase-7.md) |
 
 ## Quick start
 
@@ -69,6 +70,17 @@ make chat                                                       # REPL; /new /th
 .venv/bin/python -m jarvis_rag.agent --thread work              # same thread id = same memory
 make eval-agent                                                 # tool choice, numbers, citations, abstention
 ```
+
+No GPU, or want a bigger model? Switch providers in `.env` (everything else stays the same):
+
+```bash
+LLM_PROVIDER=groq  GROQ_API_KEY=...        # or gemini / openrouter, all with free tiers
+LLM_FALLBACK=ollama                        # rate-limited? that step runs locally instead
+EMBED_PROVIDER=fastembed                   # embeddings in-process on CPU, no Ollama needed
+make providers                             # which models your keys can use today
+```
+
+Hosted providers see your questions and the retrieved document chunks. Keep private data on Ollama.
 
 Use it in the browser:
 

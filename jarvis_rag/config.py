@@ -10,7 +10,7 @@ from typing import Literal
 
 from typing import Annotated
 
-from pydantic import SecretStr, field_validator
+from pydantic import AliasChoices, Field, SecretStr, field_validator
 from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 
@@ -24,6 +24,22 @@ class Settings(BaseSettings):
     # Providers
     llm_provider: Literal["ollama", "groq", "gemini", "openrouter"] = "ollama"
     embed_provider: Literal["ollama", "fastembed"] = "ollama"
+
+    # Hosted providers (Phase 7): free tiers, keys from each provider's console.
+    # Your prompts, including retrieved document chunks, are sent to the provider.
+    groq_api_key: SecretStr | None = None
+    groq_model: str = "openai/gpt-oss-20b"
+    gemini_api_key: SecretStr | None = Field(default=None,
+                                             validation_alias=AliasChoices("gemini_api_key", "google_api_key"))
+    gemini_model: str = "gemini-3.5-flash-lite"
+    openrouter_api_key: SecretStr | None = None
+    openrouter_model: str = "google/gemma-4-31b-it:free"
+    llm_fallback: Literal["ollama", "groq", "gemini", "openrouter"] | None = None  # used when the main LLM errors
+    llm_max_retries: int = 3
+    llm_timeout: float = 120.0
+    reasoning_effort: str | None = None  # hosted reasoning models: "low" | "medium" | "high"
+    fastembed_model: str = "nomic-ai/nomic-embed-text-v1.5"  # same vectors as Ollama's nomic-embed-text
+    fastembed_batch_size: int = 1  # bigger batches pad to the longest chunk: slower and far more RAM
 
     # Ollama
     ollama_base_url: str = "http://localhost:11434"
@@ -108,7 +124,8 @@ class Settings(BaseSettings):
     def _split_origins(cls, v):
         return [o.strip() for o in v.split(",") if o.strip()] if isinstance(v, str) else v
 
-    @field_validator("api_key", "ui_password", mode="before")
+    @field_validator("api_key", "ui_password", "groq_api_key", "gemini_api_key", "openrouter_api_key",
+                     "llm_fallback", "reasoning_effort", mode="before")
     @classmethod
     def _empty_key_is_none(cls, v):
         return None if isinstance(v, str) and not v.strip() else v

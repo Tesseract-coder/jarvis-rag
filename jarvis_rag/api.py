@@ -40,6 +40,7 @@ from jarvis_rag import loaders
 from jarvis_rag.agent import build_agent, check_citations, stream_events
 from jarvis_rag.config import Settings, get_settings
 from jarvis_rag.ingest import collect, ingest_documents
+from jarvis_rag.llm import model_name
 from jarvis_rag.tools import make_web_loader
 from jarvis_rag.vectorstore import KnowledgeBase
 
@@ -201,13 +202,14 @@ def create_app(settings: Settings | None = None, kb: KnowledgeBase | None = None
     @app.get("/health")
     def health() -> JSONResponse:
         ollama = None
-        if s.llm_provider == "ollama" or s.embed_provider == "ollama":
+        if "ollama" in (s.llm_provider, s.embed_provider):
             try:
                 ollama = httpx.get(f"{s.ollama_base_url}/api/version", timeout=2).status_code == 200
             except httpx.HTTPError:
                 ollama = False
         ok = ollama is not False
-        return JSONResponse({"status": "ok" if ok else "degraded", "ollama": ollama, "model": s.chat_model},
+        return JSONResponse({"status": "ok" if ok else "degraded", "ollama": ollama, "provider": s.llm_provider,
+                             "model": model_name(s)},
                             status_code=200 if ok else 503)
 
     # ---- chat
