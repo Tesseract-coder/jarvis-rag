@@ -9,7 +9,7 @@ FALLBACK_CHAT_MODEL ?= qwen3:1.7b
 EMBED_MODEL ?= nomic-embed-text
 DATA_DIR ?= data
 
-.PHONY: help setup lock pull-models check test demo-data ingest sources eval eval-answers chat eval-agent api ui app providers docker-build docker-up docker-down docker-logs docker-ingest space space-test space-push
+.PHONY: help setup lock pull-models check test demo-data ingest sources eval eval-answers chat eval-agent api ui app providers docker-build docker-up docker-down docker-logs docker-ingest space space-test space-push train-setup train-data train export-reader eval-reader
 
 help:
 	@grep -hE '^[a-z-]+:.*## ' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  %-12s %s\n", $$1, $$2}'
@@ -93,5 +93,22 @@ space-push: space ## create/update the Space (needs: hf auth login, SPACE=user/n
 	.venv/bin/hf upload $(SPACE) build/hf-space . --repo-type space --commit-message "Deploy JARVIS $$(git rev-parse --short HEAD)"
 	@echo "Building on HF: https://huggingface.co/spaces/$(SPACE)  (app: https://$$(echo $(SPACE) | tr '/' '-').hf.space/ui/)"
 
+train-setup: ## Phase 10: separate .venv-train with Unsloth + PyTorch/CUDA wheels (~6 GB, no system CUDA needed)
+	uv venv .venv-train --python 3.12
+	uv pip sync requirements-train.txt --python .venv-train/bin/python --require-hashes
+
+train-data: ## build the reader dataset from docs/ + learn/ with a Groq teacher (needs GROQ_API_KEY; resumable)
+	$(PY) finetune/make_dataset.py
+
+train: ## QLoRA fine-tune Qwen3-1.7B as the reader (~4 h on a GTX 1650; unloads Ollama models first)
+	-curl -s localhost:11434/api/ps | $(PY) -c "import json,sys,urllib.request as u; [u.urlopen(u.Request('http://localhost:11434/api/generate', json.dumps({'model': m['name'], 'keep_alive': 0}).encode())) for m in json.load(sys.stdin)['models']]"
+	systemd-inhibit --what=sleep:idle:handle-lid-switch --why="QLoRA training" .venv-train/bin/python finetune/train.py --epochs 1  # a suspend kills the CUDA context
+
+export-reader: ## merge LoRA -> GGUF -> Q4_K_M (builds llama-quantize, CPU) -> ollama create jarvis-reader:1.7b
+	.venv-train/bin/python finetune/export.py
+
+eval-reader: ## compare readers on identical Halcyon contexts (needs GROQ_API_KEY for the judge)
+	$(PY) finetune/eval_reader.py --models qwen3:1.7b jarvis-reader:1.7b qwen3:4b-instruct
+
 test: ## run the test suite (no GPU or Ollama needed)
-	$(PY) -m pytest -q
+	$(PY) -m pytest -q tests

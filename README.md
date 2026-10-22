@@ -4,7 +4,7 @@
 code, websites and CSVs. Built in phases as a learn-by-building project; teaching notes
 live in [`docs/`](docs/).
 
-> Status: **Phase 9: Hugging Face Space bundle** ✅ (tested locally; hosting Docker Spaces now needs HF PRO, so not deployed)
+> Status: **Phase 10: fine-tuned reader** ✅ (`jarvis-reader:1.7b`: citations 18% → 84% vs the base 1.7B, at 2.2× the 4B's speed)
 
 | Phase | Notes |
 |---|---|
@@ -18,6 +18,7 @@ live in [`docs/`](docs/).
 | 7: Providers: Groq / Gemini / OpenRouter free tiers, FastEmbed CPU embeddings, local fallback | [docs/phase-7.md](docs/phase-7.md) |
 | 8: Docker: hardened CPU image, Compose with the host's Ollama or fully self-contained | [docs/phase-8.md](docs/phase-8.md) |
 | 9: Hugging Face Space: baked read-only demo, build gated on the retrieval eval | [docs/phase-9.md](docs/phase-9.md) |
+| 10: Fine-tuning: QLoRA (Unsloth) on a 4 GB GPU → GGUF → Ollama, a reader that cites and abstains | [docs/phase-10.md](docs/phase-10.md) |
 
 ## Quick start
 
@@ -140,3 +141,7 @@ All configuration lives in `.env` (see [`.env.example`](.env.example)).
 | Embeddings | `nomic-embed-text` (768-dim) | CPU, so it never evicts the chat model |
 
 With 8 GB+ VRAM, try `CHAT_MODEL=qwen3:8b`; with 12 GB+, `qwen3:14b`.
+
+Optional: `jarvis-reader:1.7b`, fine-tuned in Phase 10 (`make train-setup train-data train export-reader`).
+It is a *reader* (passages in, cited answer or abstention out), not a tool-calling agent model, so
+it is not a drop-in `CHAT_MODEL`. See [docs/phase-10.md](docs/phase-10.md) for the comparison.

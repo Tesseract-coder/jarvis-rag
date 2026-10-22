@@ -1,0 +1,9 @@
+# Phase 10 fine-tuning environment (.venv-train), separate from the app: PyTorch +
+# CUDA wheels are several GB and only needed to train. `make train-setup`.
+# Pinned to releases >= 2 weeks old at lock time (2026-10-21).
+unsloth==2026.10.1
+unsloth-zoo==2026.10.1
+datasets
+gguf            # llama.cpp's GGUF writer, used by its convert scripts (no C++ build needed)
+pydantic-settings>=2.10,<3
+httpx

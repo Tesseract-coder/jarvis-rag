@@ -1,5 +1,6 @@
 # python
 .venv/
+.venv-train/
 __pycache__/
 *.pyc
 .pytest_cache/
@@ -23,3 +24,8 @@ eval/results/
 # deploy bundles (make space)
 build/
 .space-secrets
+
+# fine-tuning outputs (datasets, adapters, merged weights, GGUF)
+finetune/out/
+finetune/llama.cpp/
+unsloth_compiled_cache/
